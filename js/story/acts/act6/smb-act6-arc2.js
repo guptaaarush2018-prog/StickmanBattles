@@ -1,0 +1,53 @@
+// Appends chapters for act6/smb-act6-arc2.js.
+STORY_CHAPTER_REGISTRY.push(
+  {
+    id: 72, title: 'Proof of Understanding',
+    world: '🌌 The Void Between — The Fallen God\'s Trial',
+    narrative: [
+      '"I will not destroy you.",',
+      '"I am testing what you carry.",',
+      '',
+      '"The Creator built a weapon against the Void Mind.",',
+      '"You carry the piece it carved from itself.",',
+      '',
+      '"One of you understands what must be preserved.",',
+      '"Prove it was you.",',
+    ],
+    storeNag: '⚠️ BOSS FIGHT — The Fallen God. Final trial before the Creator\'s domain.',
+    isBossFight: true,
+    bossType: 'fallen_god',
+    arena: 'space',
+    playerLives: 2,
+    tokenReward: 200, blueprintDrop: 'godfall_seal',
+    fightScript: [
+      { frame: 60,   text: '"You carry the fragment. Now prove you are worthy of it."',  color: '#ffcc44', timer: 200 },
+      { frame: 360,  text: '"The Creator built to break. You were built to hold."',      color: '#ffdd88', timer: 220 },
+      { frame: 720,  text: '"Good. Do not stop."',                                       color: '#ffee99', timer: 180 },
+      { frame: 1100, text: '"You are worthy of what you carry."',                        color: '#ffffff',  timer: 240 },
+    ],
+    postText: 'The Fallen God stills. Not defeated — satisfied. "The walls hold. So will you." It steps aside. The way to the Creator\'s domain is clear.',
+  },
+
+  {
+    id: 73, title: 'What Was Before',
+    world: '🌌 The Void Between — The Fallen God\'s Last Words',
+    noFight: true,
+    narrative: [
+      'The Fallen God speaks one last time before withdrawing.',
+      '',
+      '"Before the fracture, seventeen dimensions lived in separation.",',
+      '"Not isolation. Design.",',
+      '',
+      '"The Creator thought separation was weakness.",',
+      '"They were brilliant. They were wrong.",',
+      '"The fracture is the proof.",',
+      '',
+      '"You carry its conscience.",',
+      '"When you face it — remind it of what it was.",',
+      '',
+      '"That is all I ask.",',
+    ],
+    tokenReward: 150,
+    postText: 'The Fallen God is gone. What remains is clarity: the Creator\'s domain lies ahead, and you now understand both sides of what it built. The compass burns. You go forward.',
+  },
+);

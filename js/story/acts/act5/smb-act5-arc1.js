@@ -1,0 +1,36 @@
+// Appends chapters for act5/smb-act5-arc1.js.
+STORY_CHAPTER_REGISTRY.push(
+  {
+    id: 90, title: 'What Remains',
+    world: '🕳️ The Void Between',
+    isEpilogue: false,
+    narrative: [
+      'You expected silence.',
+      '',
+      'Instead: more light.',
+      '',
+      'The rift was sealed.',
+      'The fragment was gone.',
+      'But something of it remained — fused to you.',
+      'Not a fragment anymore.',
+      '',
+      'A true form.',
+      '',
+      '"The system had a failsafe," the rift entity\'s last voice said.',
+      '"If the closure protocol succeeded, it would release what it had been holding."',
+      '"Its purest construct. Its True Form."',
+      '"The original template for all fracture entities."',
+      '"It feeds on the closure energy itself."',
+      '"It will come for you."',
+      '"And you will be the only thing that can stop it."',
+      '',
+      'The void tears open.',
+    ],
+    fightScript: [],
+    preText: null,
+    noFight: true,
+    tokenReward: 50,
+    postText: 'You are still here. The void holds. The True Form is coming.',
+  },
+
+);
