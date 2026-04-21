@@ -30,6 +30,9 @@ const { createServer } = require('http');
 const { Server }       = require('socket.io');
 const fs               = require('fs');
 const path             = require('path');
+const mime             = require('mime-types');
+
+const STATIC_ROOT = __dirname;
 
 const PORT      = process.env.PORT      || 3001;
 const ADMIN_KEY = process.env.ADMIN_KEY || 'smb-dev-key-change-me';
@@ -248,10 +251,28 @@ function _handleRequest(req, res) {
   }
 
   // ── Socket.io owns /socket.io/* — leave those alone ──────────────────────────
-  // For any other unrecognised path, return 404 so browsers don't hang.
-  if (!pathname.startsWith('/socket.io')) {
-    _json(res, 404, { error: 'Not found' });
+  if (pathname.startsWith('/socket.io')) return;
+
+  // ── Static file serving ───────────────────────────────────────────────────────
+  // Resolve the requested path; default '/' to index.html.
+  const safePath = pathname === '/' ? '/index.html' : pathname;
+  const filePath = path.join(STATIC_ROOT, safePath);
+
+  // Prevent directory traversal outside STATIC_ROOT.
+  if (!filePath.startsWith(STATIC_ROOT + path.sep) && filePath !== STATIC_ROOT) {
+    _json(res, 403, { error: 'Forbidden' });
+    return;
   }
+
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      _json(res, 404, { error: 'Not found' });
+      return;
+    }
+    const contentType = mime.lookup(filePath) || 'application/octet-stream';
+    res.writeHead(200, { 'Content-Type': contentType });
+    res.end(data);
+  });
 }
 
 // ── HTTP Server + Socket.io ───────────────────────────────────────────────────

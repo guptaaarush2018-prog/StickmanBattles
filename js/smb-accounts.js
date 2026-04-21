@@ -70,6 +70,15 @@ const AccountManager = (() => {
       });
     }
 
+    // Migration: ensure every account has an auth field (passwords + lock state)
+    if (p.accounts && Object.values(p.accounts).some(function(a) { return !a.auth; })) {
+      GameState.update(function(s) {
+        Object.values(s.persistent.accounts || {}).forEach(function(a) {
+          if (!a.auth) a.auth = { passwordHash: null, recoveryCodeHash: null, locked: false };
+        });
+      });
+    }
+
     // Already have a valid active account — flush and return
     if (p.accounts && Object.keys(p.accounts).length > 0 && GameState.getPersistent().activeAccountId) {
       _persist();
@@ -195,6 +204,130 @@ const AccountManager = (() => {
     if (typeof saveGame === 'function') saveGame();
   }
 
+  // ── Auth helpers ─────────────────────────────────────────────────────────────
+  function _hashStr(s) {
+    let h = 5381;
+    for (let i = 0; i < s.length; i++) h = Math.imul(h, 33) ^ s.charCodeAt(i);
+    return (h >>> 0).toString(16).padStart(8, '0');
+  }
+
+  function _hashPassword(plaintext, salt) {
+    const a = _hashStr(salt + ':' + plaintext);
+    const b = _hashStr(plaintext + ':' + a);
+    return a + b;
+  }
+
+  function _genRecoveryCode() {
+    const ch = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let c = '';
+    for (let i = 0; i < 12; i++) {
+      if (i > 0 && i % 4 === 0) c += '-';
+      c += ch[Math.floor(Math.random() * ch.length)];
+    }
+    return c;
+  }
+
+  function hasPassword(id) {
+    const p = GameState.getPersistent();
+    const acct = p.accounts && p.accounts[id];
+    return !!(acct && acct.auth && acct.auth.passwordHash);
+  }
+
+  function verifyPassword(id, plaintext) {
+    const p = GameState.getPersistent();
+    const acct = p.accounts && p.accounts[id];
+    if (!acct || !acct.auth || !acct.auth.passwordHash) return true;
+    return _hashPassword(String(plaintext), id) === acct.auth.passwordHash;
+  }
+
+  // Returns the plaintext recovery code on success, null on failure.
+  function setPassword(id, plaintext) {
+    const p = GameState.getPersistent();
+    if (!p.accounts || !p.accounts[id]) return null;
+    const code = _genRecoveryCode();
+    const passwordHash    = _hashPassword(String(plaintext), id);
+    const recoveryCodeHash = _hashPassword(code, id + '_rc');
+    GameState.update(function(s) {
+      if (!s.persistent.accounts[id].auth) s.persistent.accounts[id].auth = {};
+      s.persistent.accounts[id].auth.passwordHash    = passwordHash;
+      s.persistent.accounts[id].auth.recoveryCodeHash = recoveryCodeHash;
+      s.persistent.accounts[id].auth.locked           = false;
+    });
+    _persist();
+    return code;
+  }
+
+  function changePassword(id, oldPlaintext, newPlaintext) {
+    if (!verifyPassword(id, oldPlaintext)) return false;
+    const p = GameState.getPersistent();
+    if (!p.accounts || !p.accounts[id]) return false;
+    GameState.update(function(s) {
+      if (!s.persistent.accounts[id].auth) s.persistent.accounts[id].auth = {};
+      s.persistent.accounts[id].auth.passwordHash = _hashPassword(String(newPlaintext), id);
+    });
+    _persist();
+    return true;
+  }
+
+  function removePassword(id, plaintext) {
+    if (!verifyPassword(id, plaintext)) return false;
+    const p = GameState.getPersistent();
+    if (!p.accounts || !p.accounts[id]) return false;
+    GameState.update(function(s) {
+      if (s.persistent.accounts[id].auth) {
+        s.persistent.accounts[id].auth.passwordHash    = null;
+        s.persistent.accounts[id].auth.recoveryCodeHash = null;
+        s.persistent.accounts[id].auth.locked           = false;
+      }
+    });
+    _persist();
+    return true;
+  }
+
+  // Returns new plaintext recovery code on success, false on bad code.
+  function resetPasswordWithCode(id, code, newPlaintext) {
+    const p    = GameState.getPersistent();
+    const acct = p.accounts && p.accounts[id];
+    if (!acct || !acct.auth || !acct.auth.recoveryCodeHash) return false;
+    const codeHash = _hashPassword(String(code).trim().toUpperCase(), id + '_rc');
+    if (codeHash !== acct.auth.recoveryCodeHash) return false;
+    const newCode    = _genRecoveryCode();
+    const newRCHash  = _hashPassword(newCode, id + '_rc');
+    const newPwHash  = _hashPassword(String(newPlaintext), id);
+    GameState.update(function(s) {
+      s.persistent.accounts[id].auth.passwordHash    = newPwHash;
+      s.persistent.accounts[id].auth.recoveryCodeHash = newRCHash;
+      s.persistent.accounts[id].auth.locked           = false;
+    });
+    _persist();
+    return newCode;
+  }
+
+  function isLocked(id) {
+    const p    = GameState.getPersistent();
+    const acct = p.accounts && p.accounts[id];
+    return !!(acct && acct.auth && acct.auth.locked && acct.auth.passwordHash);
+  }
+
+  function lockAccount(id) {
+    const p = GameState.getPersistent();
+    if (!p.accounts || !p.accounts[id]) return false;
+    if (!hasPassword(id)) return false;
+    GameState.update(function(s) {
+      if (!s.persistent.accounts[id].auth) s.persistent.accounts[id].auth = {};
+      s.persistent.accounts[id].auth.locked = true;
+    });
+    _persist();
+    return true;
+  }
+
+  function logoutCurrentAccount() {
+    const active = getActiveAccount();
+    if (!active || !hasPassword(active.id)) return false;
+    if (typeof saveGame === 'function') saveGame();
+    return lockAccount(active.id);
+  }
+
   // Initialize on script parse (before smb-save.js runs)
   loadAccounts();
 
@@ -209,6 +342,16 @@ const AccountManager = (() => {
     switchAccount,
     deleteAccount,
     saveAccountData,
+    // Auth
+    hasPassword,
+    verifyPassword,
+    setPassword,
+    changePassword,
+    removePassword,
+    resetPasswordWithCode,
+    isLocked,
+    lockAccount,
+    logoutCurrentAccount,
   };
 })();
 
