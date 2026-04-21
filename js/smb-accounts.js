@@ -360,107 +360,317 @@ function isSuperuserAccountId(accountId) {
 }
 
 // ── UI ────────────────────────────────────────────────────────────────────────
+// Multi-view modal: 'list' | 'login' | 'setpw' | 'recovery' | 'showcode'
+
+let _acctModalData = { view: 'list', targetId: null, recoveryCode: null };
 
 function openAccountsModal() {
-  let modal = document.getElementById('accountsModal');
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'accountsModal';
-    modal.style.cssText = [
-      'display:none','position:fixed','inset:0',
-      'background:rgba(0,0,0,0.88)','z-index:10000',
-      'align-items:center','justify-content:center',
-    ].join(';');
-    modal.innerHTML = [
-      '<div style="background:#0b0b1e;border:1px solid rgba(100,180,255,0.3);border-radius:12px;',
-        'padding:28px;width:min(440px,90vw);color:#dde4ff;',
-        "font-family:'Segoe UI',Arial,sans-serif;box-shadow:0 0 40px rgba(0,100,255,0.18);\">",
-        '<h3 style="margin:0 0 16px;font-size:1.1rem;color:#88ccff;">&#128100; Accounts</h3>',
-        '<div id="accountsList" style="display:flex;flex-direction:column;gap:8px;',
-          'max-height:260px;overflow-y:auto;margin-bottom:16px;"></div>',
-        '<div style="display:flex;gap:8px;flex-wrap:wrap;">',
-          '<button onclick="_acctCreatePrompt()" ',
-            'style="background:rgba(80,160,255,0.15);border:1px solid rgba(80,160,255,0.45);',
-            'border-radius:7px;color:#88ccff;padding:7px 16px;cursor:pointer;font-size:0.82rem;flex:1;">',
-            '+ New Account',
-          '</button>',
-          '<button onclick="closeAccountsModal()" ',
-            'style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.18);',
-            'border-radius:7px;color:#aab;padding:7px 16px;cursor:pointer;font-size:0.82rem;">',
-            'Close',
-          '</button>',
-        '</div>',
-      '</div>',
-    ].join('');
-    document.body.appendChild(modal);
-  }
-  _acctRefreshList();
-  modal.style.display = 'flex';
+  _acctModalData = { view: 'list', targetId: null, recoveryCode: null };
+  _acctEnsureModal();
+  _acctRender();
+  document.getElementById('accountsModal').style.display = 'flex';
 }
 
 function closeAccountsModal() {
-  const modal = document.getElementById('accountsModal');
-  if (modal) modal.style.display = 'none';
+  const m = document.getElementById('accountsModal');
+  if (m) m.style.display = 'none';
 }
 
-function _acctRefreshList() {
-  const list = document.getElementById('accountsList');
-  if (!list) return;
-  const accounts = AccountManager.getAllAccounts();
-  const active   = AccountManager.getActiveAccount();
-  list.innerHTML  = '';
+function _acctEnsureModal() {
+  if (document.getElementById('accountsModal')) return;
+  const m = document.createElement('div');
+  m.id = 'accountsModal';
+  m.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:10000;align-items:center;justify-content:center;';
+  m.addEventListener('click', function(e) { if (e.target === m) closeAccountsModal(); });
+  const inner = document.createElement('div');
+  inner.id = 'accountsModalInner';
+  inner.style.cssText = [
+    'background:#0b0b1e',
+    'border:1px solid rgba(100,180,255,0.3)',
+    'border-radius:12px',
+    'padding:28px',
+    'width:min(480px,92vw)',
+    'max-height:88vh',
+    'overflow-y:auto',
+    'color:#dde4ff',
+    "font-family:'Segoe UI',Arial,sans-serif",
+    'box-shadow:0 0 40px rgba(0,100,255,0.18)',
+  ].join(';');
+  m.appendChild(inner);
+  document.body.appendChild(m);
+}
 
-  if (accounts.length === 0) {
-    list.innerHTML = '<div style="font-size:0.8rem;opacity:0.5;text-align:center;padding:12px;">No accounts found.</div>';
+function _acctRender() {
+  const inner = document.getElementById('accountsModalInner');
+  if (!inner) return;
+  const v = _acctModalData.view;
+  if      (v === 'list')     _acctRenderList(inner);
+  else if (v === 'login')    _acctRenderLogin(inner);
+  else if (v === 'setpw')    _acctRenderSetPw(inner);
+  else if (v === 'recovery') _acctRenderRecovery(inner);
+  else if (v === 'showcode') _acctRenderShowCode(inner);
+}
+
+// ── View: Account List ────────────────────────────────────────────────────────
+function _acctRenderList(inner) {
+  const accounts          = AccountManager.getAllAccounts();
+  const active            = AccountManager.getActiveAccount();
+  const activeHasPassword = active && AccountManager.hasPassword(active.id);
+  const activeIsLocked    = active && AccountManager.isLocked(active.id);
+
+  let rows = '';
+  accounts.forEach(function(acct) {
+    const isActive  = active && acct.id === active.id;
+    const locked    = AccountManager.isLocked(acct.id);
+    const hasPw     = AccountManager.hasPassword(acct.id);
+    const date      = new Date(acct.createdAt).toLocaleDateString();
+    const lockIcon  = locked ? '🔒 ' : (hasPw ? '🔓 ' : '');
+    const borderCol = isActive ? 'rgba(80,200,120,0.5)' : 'rgba(100,150,255,0.2)';
+    const bgCol     = isActive ? 'rgba(40,120,80,0.18)' : 'rgba(255,255,255,0.04)';
+    const nameCol   = isActive ? '#88ffaa' : '#dde4ff';
+
+    let actionBtn = '';
+    if (isActive && locked) {
+      actionBtn = '<button onclick="_acctNav(\'login\',\'' + _acctEscId(acct.id) + '\')" style="' + _acctBtnStyle('blue') + '">Login</button>';
+    } else if (!isActive) {
+      actionBtn = '<button onclick="_acctClickSwitch(\'' + _acctEscId(acct.id) + '\')" style="' + _acctBtnStyle('blue') + '">' + (locked ? 'Login' : 'Switch') + '</button>';
+    }
+
+    const renameBtn = '<button onclick="_acctRenamePrompt(\'' + _acctEscId(acct.id) + '\',\'' + _acctEscStr(acct.username) + '\')" style="' + _acctBtnStyle('green') + '">Rename</button>';
+    const pwBtn     = '<button onclick="_acctGoSetPw(\'' + _acctEscId(acct.id) + '\')" style="' + _acctBtnStyle('purple') + '">' + (hasPw ? 'Password' : 'Set PW') + '</button>';
+    const delBtn    = '<button onclick="_acctConfirmDelete(\'' + _acctEscId(acct.id) + '\',\'' + _acctEscStr(acct.username) + '\')" style="' + _acctBtnStyle('red') + '">Delete</button>';
+
+    rows += '<div style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;border:1px solid ' + borderCol + ';background:' + bgCol + ';margin-bottom:6px;">'
+          + '<div style="flex:1;min-width:0;">'
+          + '<div style="font-size:0.88rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:' + nameCol + ';">'
+          + lockIcon + _acctEscHtml(acct.username) + (isActive ? ' <span style="font-size:0.7rem;color:#88ffaa;">(active)</span>' : '')
+          + '</div>'
+          + '<div style="font-size:0.7rem;opacity:0.45;">Created ' + date + '</div>'
+          + '</div>'
+          + '<div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;">'
+          + actionBtn + renameBtn + pwBtn + delBtn
+          + '</div></div>';
+  });
+
+  if (!rows) rows = '<div style="font-size:0.8rem;opacity:0.5;text-align:center;padding:12px;">No accounts found.</div>';
+
+  const logoutBtn = (activeHasPassword && !activeIsLocked)
+    ? '<button onclick="_acctLogout()" style="' + _acctBtnStyle('orange') + ';flex:1;">🔒 Log Out</button>'
+    : '';
+
+  inner.innerHTML = '<h3 style="margin:0 0 16px;font-size:1.1rem;color:#88ccff;">👤 Accounts</h3>'
+    + '<div style="max-height:300px;overflow-y:auto;margin-bottom:14px;">' + rows + '</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+    + '<button onclick="_acctCreatePrompt()" style="' + _acctBtnStyle('blue') + ';flex:1;">+ New Account</button>'
+    + logoutBtn
+    + '<button onclick="closeAccountsModal()" style="' + _acctBtnStyle('dim') + '">Close</button>'
+    + '</div>';
+}
+
+// ── View: Login ───────────────────────────────────────────────────────────────
+function _acctRenderLogin(inner) {
+  const id   = _acctModalData.targetId;
+  const p    = GameState.getPersistent();
+  const acct = p.accounts && p.accounts[id];
+  if (!acct) { _acctModalData.view = 'list'; _acctRender(); return; }
+
+  inner.innerHTML = '<h3 style="margin:0 0 6px;font-size:1.1rem;color:#88ccff;">🔒 Login</h3>'
+    + '<p style="margin:0 0 16px;font-size:0.82rem;opacity:0.6;">Enter password for <strong style="color:#dde4ff;">' + _acctEscHtml(acct.username) + '</strong></p>'
+    + '<input id="_acctPwInput" type="password" placeholder="Password" autocomplete="current-password"'
+    + ' style="' + _acctInputStyle() + '" onkeydown="if(event.key===\'Enter\')_acctSubmitLogin()">'
+    + '<div id="_acctLoginErr" style="color:#ff7777;font-size:0.78rem;margin-top:6px;min-height:18px;"></div>'
+    + '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">'
+    + '<button onclick="_acctSubmitLogin()" style="' + _acctBtnStyle('blue') + ';flex:1;">Login</button>'
+    + '<button onclick="_acctGoRecovery(\'' + _acctEscId(id) + '\')" style="' + _acctBtnStyle('dim') + '">Forgot password?</button>'
+    + '<button onclick="_acctNav(\'list\')" style="' + _acctBtnStyle('dim') + '">Back</button>'
+    + '</div>';
+
+  setTimeout(function() { const i = document.getElementById('_acctPwInput'); if (i) i.focus(); }, 50);
+}
+
+function _acctSubmitLogin() {
+  const id  = _acctModalData.targetId;
+  const inp = document.getElementById('_acctPwInput');
+  const err = document.getElementById('_acctLoginErr');
+  if (!inp) return;
+  if (!AccountManager.verifyPassword(id, inp.value)) {
+    if (err) err.textContent = 'Incorrect password.';
+    inp.value = ''; inp.focus();
     return;
   }
-
-  accounts.forEach(function(acct) {
-    const isActive = active && acct.id === active.id;
-    const date     = new Date(acct.createdAt).toLocaleDateString();
-    const row      = document.createElement('div');
-    row.style.cssText = [
-      'display:flex','align-items:center','gap:8px','padding:8px 12px','border-radius:8px',
-      'border:1px solid ' + (isActive ? 'rgba(80,200,120,0.5)' : 'rgba(100,150,255,0.2)'),
-      'background:'       + (isActive ? 'rgba(40,120,80,0.18)'  : 'rgba(255,255,255,0.04)'),
-    ].join(';');
-
-    const switchBtn = !isActive
-      ? '<button onclick="AccountManager.switchAccount(\'' + _acctEscId(acct.id) + '\');_acctRefreshList();_acctToast(\'Switched to ' + _acctEscStr(acct.username) + '\')" '
-        + 'style="background:rgba(80,160,255,0.15);border:1px solid rgba(80,160,255,0.4);border-radius:6px;color:#88ccff;padding:4px 10px;cursor:pointer;font-size:0.75rem;">Switch</button>'
-      : '';
-
-    const renameBtn = '<button onclick="_acctRenamePrompt(\'' + _acctEscId(acct.id) + '\',\'' + _acctEscStr(acct.username) + '\')" '
-      + 'style="background:rgba(120,200,80,0.12);border:1px solid rgba(120,200,80,0.35);border-radius:6px;color:#aaffaa;padding:4px 10px;cursor:pointer;font-size:0.75rem;">Rename</button>';
-
-    const delBtn = '<button onclick="_acctConfirmDelete(\'' + _acctEscId(acct.id) + '\',\'' + _acctEscStr(acct.username) + '\')" '
-      + 'style="background:rgba(255,60,60,0.12);border:1px solid rgba(255,80,80,0.35);border-radius:6px;color:#ff8888;padding:4px 10px;cursor:pointer;font-size:0.75rem;">Delete</button>';
-
-    row.innerHTML = [
-      '<div style="flex:1;min-width:0;">',
-        '<div style="font-size:0.88rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:' + (isActive ? '#88ffaa' : '#dde4ff') + ';">',
-          _acctEscHtml(acct.username),
-          isActive ? ' <span style="font-size:0.7rem;color:#88ffaa;">(active)</span>' : '',
-        '</div>',
-        '<div style="font-size:0.7rem;opacity:0.45;">Created ' + date + '</div>',
-        '<div style="font-size:0.63rem;opacity:0.28;font-family:monospace;cursor:pointer;margin-top:1px;" ' +
-          'onclick="navigator.clipboard&&navigator.clipboard.writeText(\'' + _acctEscId(acct.id) + '\')" ' +
-          'title="Your player ID — click to copy">ID: ' + _acctEscHtml(acct.id) + '</div>',
-      '</div>',
-      switchBtn,
-      renameBtn,
-      delBtn,
-    ].join('');
-
-    list.appendChild(row);
+  GameState.update(function(s) {
+    if (s.persistent.accounts[id] && s.persistent.accounts[id].auth)
+      s.persistent.accounts[id].auth.locked = false;
   });
+  GameState.save();
+  const p = GameState.getPersistent();
+  if (p.activeAccountId !== id) AccountManager.switchAccount(id);
+  const acct = GameState.getPersistent().accounts[id];
+  closeAccountsModal();
+  _acctToast('Logged in as ' + (acct ? acct.username : 'account'));
 }
 
+// ── View: Set / Change / Remove Password ─────────────────────────────────────
+function _acctRenderSetPw(inner) {
+  const id    = _acctModalData.targetId;
+  const p     = GameState.getPersistent();
+  const acct  = p.accounts && p.accounts[id];
+  if (!acct) { _acctModalData.view = 'list'; _acctRender(); return; }
+  const hasPw = AccountManager.hasPassword(id);
+
+  inner.innerHTML = '<h3 style="margin:0 0 6px;font-size:1.1rem;color:#88ccff;">🔐 Password — ' + _acctEscHtml(acct.username) + '</h3>'
+    + '<p style="margin:0 0 12px;font-size:0.78rem;opacity:0.55;">' + (hasPw ? 'Change or remove your password.' : 'Set a password to lock this account. You\'ll receive a recovery code.') + '</p>'
+    + (hasPw ? '<input id="_acctOldPw" type="password" placeholder="Current password" autocomplete="current-password" style="' + _acctInputStyle() + ';margin-bottom:8px;">' : '')
+    + '<input id="_acctNewPw" type="password" placeholder="' + (hasPw ? 'New password' : 'Password') + '" autocomplete="new-password" style="' + _acctInputStyle() + ';margin-bottom:8px;">'
+    + '<input id="_acctConfPw" type="password" placeholder="Confirm password" autocomplete="new-password" style="' + _acctInputStyle() + ';margin-bottom:4px;" onkeydown="if(event.key===\'Enter\')_acctSubmitSetPw()">'
+    + '<div id="_acctPwErr" style="color:#ff7777;font-size:0.78rem;min-height:18px;"></div>'
+    + '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">'
+    + '<button onclick="_acctSubmitSetPw()" style="' + _acctBtnStyle('blue') + ';flex:1;">' + (hasPw ? 'Change Password' : 'Set Password') + '</button>'
+    + (hasPw ? '<button onclick="_acctSubmitRemovePw()" style="' + _acctBtnStyle('red') + '">Remove Password</button>' : '')
+    + '<button onclick="_acctNav(\'list\')" style="' + _acctBtnStyle('dim') + '">Back</button>'
+    + '</div>';
+
+  setTimeout(function() { const i = document.getElementById(hasPw ? '_acctOldPw' : '_acctNewPw'); if (i) i.focus(); }, 50);
+}
+
+function _acctSubmitSetPw() {
+  const id    = _acctModalData.targetId;
+  const hasPw = AccountManager.hasPassword(id);
+  const oldEl = document.getElementById('_acctOldPw');
+  const newEl = document.getElementById('_acctNewPw');
+  const cfEl  = document.getElementById('_acctConfPw');
+  const err   = document.getElementById('_acctPwErr');
+  const newPw = newEl ? newEl.value : '';
+  const cfPw  = cfEl  ? cfEl.value  : '';
+  if (!newPw)           { if (err) err.textContent = 'Password cannot be empty.'; return; }
+  if (newPw !== cfPw)   { if (err) err.textContent = 'Passwords do not match.'; return; }
+  if (newPw.length < 4) { if (err) err.textContent = 'At least 4 characters required.'; return; }
+  if (hasPw) {
+    const oldPw = oldEl ? oldEl.value : '';
+    if (!AccountManager.changePassword(id, oldPw, newPw)) {
+      if (err) err.textContent = 'Current password is incorrect.';
+      if (oldEl) { oldEl.value = ''; oldEl.focus(); }
+      return;
+    }
+    _acctNav('list');
+    _acctToast('Password changed.');
+  } else {
+    const code = AccountManager.setPassword(id, newPw);
+    _acctModalData.recoveryCode = code;
+    _acctNav('showcode');
+  }
+}
+
+function _acctSubmitRemovePw() {
+  const id    = _acctModalData.targetId;
+  const oldEl = document.getElementById('_acctOldPw');
+  const err   = document.getElementById('_acctPwErr');
+  const oldPw = oldEl ? oldEl.value : '';
+  if (!AccountManager.removePassword(id, oldPw)) {
+    if (err) err.textContent = 'Incorrect password.';
+    if (oldEl) { oldEl.value = ''; oldEl.focus(); }
+    return;
+  }
+  _acctNav('list');
+  _acctToast('Password removed.');
+}
+
+// ── View: Recovery ────────────────────────────────────────────────────────────
+function _acctRenderRecovery(inner) {
+  const id   = _acctModalData.targetId;
+  const p    = GameState.getPersistent();
+  const acct = p.accounts && p.accounts[id];
+  if (!acct) { _acctModalData.view = 'list'; _acctRender(); return; }
+
+  inner.innerHTML = '<h3 style="margin:0 0 6px;font-size:1.1rem;color:#88ccff;">🔑 Password Recovery</h3>'
+    + '<p style="margin:0 0 12px;font-size:0.82rem;opacity:0.6;">Account: <strong style="color:#dde4ff;">' + _acctEscHtml(acct.username) + '</strong></p>'
+    + '<p style="margin:0 0 12px;font-size:0.78rem;opacity:0.55;">Enter your 12-character recovery code and a new password.</p>'
+    + '<input id="_acctRcCode" type="text" placeholder="XXXX-XXXX-XXXX" autocomplete="off" maxlength="14"'
+    + ' style="' + _acctInputStyle() + ';margin-bottom:8px;text-transform:uppercase;letter-spacing:2px;font-family:monospace;"'
+    + ' oninput="this.value=this.value.toUpperCase()">'
+    + '<input id="_acctRcNewPw" type="password" placeholder="New password" autocomplete="new-password" style="' + _acctInputStyle() + ';margin-bottom:8px;">'
+    + '<input id="_acctRcCfPw" type="password" placeholder="Confirm new password" autocomplete="new-password" style="' + _acctInputStyle() + ';margin-bottom:4px;"'
+    + ' onkeydown="if(event.key===\'Enter\')_acctSubmitRecovery()">'
+    + '<div id="_acctRcErr" style="color:#ff7777;font-size:0.78rem;min-height:18px;"></div>'
+    + '<div style="display:flex;gap:8px;margin-top:14px;">'
+    + '<button onclick="_acctSubmitRecovery()" style="' + _acctBtnStyle('blue') + ';flex:1;">Reset Password</button>'
+    + '<button onclick="_acctNav(\'login\')" style="' + _acctBtnStyle('dim') + '">Back</button>'
+    + '</div>';
+
+  setTimeout(function() { const i = document.getElementById('_acctRcCode'); if (i) i.focus(); }, 50);
+}
+
+function _acctSubmitRecovery() {
+  const id    = _acctModalData.targetId;
+  const code  = ((document.getElementById('_acctRcCode')  || {}).value || '').trim().toUpperCase();
+  const newPw = ((document.getElementById('_acctRcNewPw') || {}).value || '');
+  const cfPw  = ((document.getElementById('_acctRcCfPw')  || {}).value || '');
+  const err   = document.getElementById('_acctRcErr');
+  if (!code)            { if (err) err.textContent = 'Enter your recovery code.'; return; }
+  if (!newPw)           { if (err) err.textContent = 'Enter a new password.'; return; }
+  if (newPw !== cfPw)   { if (err) err.textContent = 'Passwords do not match.'; return; }
+  if (newPw.length < 4) { if (err) err.textContent = 'At least 4 characters required.'; return; }
+  const newCode = AccountManager.resetPasswordWithCode(id, code, newPw);
+  if (!newCode) { if (err) err.textContent = 'Invalid recovery code. Check it and try again.'; return; }
+  _acctModalData.recoveryCode = newCode;
+  _acctNav('showcode');
+}
+
+// ── View: Show Recovery Code ──────────────────────────────────────────────────
+function _acctRenderShowCode(inner) {
+  const code = _acctModalData.recoveryCode || '(error)';
+  inner.innerHTML = '<h3 style="margin:0 0 8px;font-size:1.1rem;color:#ffcc44;">⚠️ Save Your Recovery Code</h3>'
+    + '<p style="margin:0 0 12px;font-size:0.82rem;opacity:0.75;">This is shown <strong>once only</strong>. Without it you cannot recover your account if you forget your password.</p>'
+    + '<div style="background:rgba(255,200,50,0.1);border:1px solid rgba(255,200,50,0.4);border-radius:8px;padding:16px;text-align:center;margin-bottom:14px;">'
+    + '<div style="font-family:monospace;font-size:1.5rem;letter-spacing:3px;color:#ffee88;user-select:all;">' + _acctEscHtml(code) + '</div>'
+    + '<button onclick="navigator.clipboard&&navigator.clipboard.writeText(\'' + _acctEscStr(code) + '\').then(function(){_acctToast(\'Copied!\')})"'
+    + ' style="' + _acctBtnStyle('dim') + ';margin-top:10px;font-size:0.75rem;">📋 Copy</button>'
+    + '</div>'
+    + '<p style="margin:0 0 16px;font-size:0.75rem;opacity:0.5;">Store this somewhere safe — a notes app, password manager, or paper.</p>'
+    + '<button onclick="_acctNav(\'list\')" style="' + _acctBtnStyle('blue') + ';width:100%;">I\'ve Saved It — Continue</button>';
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function _acctNav(view, targetId) {
+  _acctModalData.view = view;
+  if (targetId !== undefined) _acctModalData.targetId = targetId;
+  _acctEnsureModal();
+  _acctRender();
+}
+
+function _acctGoSetPw(id)    { _acctNav('setpw', id); }
+function _acctGoRecovery(id) { _acctNav('recovery', id); }
+
+function _acctClickSwitch(id) {
+  if (AccountManager.isLocked(id)) {
+    _acctNav('login', id);
+  } else {
+    AccountManager.switchAccount(id);
+    _acctNav('list');
+    const acct = GameState.getPersistent().accounts[id];
+    _acctToast('Switched to ' + (acct ? acct.username : 'account'));
+  }
+}
+
+function _acctLogout() {
+  const active = AccountManager.getActiveAccount();
+  if (!active) return;
+  if (!AccountManager.hasPassword(active.id)) {
+    _acctToast('Set a password first to enable logout.');
+    _acctNav('setpw', active.id);
+    return;
+  }
+  AccountManager.logoutCurrentAccount();
+  _acctNav('list');
+  _acctToast('Logged out. Account is now locked.');
+}
+
+// ── Prompt helpers ────────────────────────────────────────────────────────────
 function _acctCreatePrompt() {
   const name = prompt('Enter a name for the new account (max 20 chars):');
   if (name === null) return;
   AccountManager.createAccount(name);
-  _acctRefreshList();
+  _acctNav('list');
   _acctToast('Account created!');
 }
 
@@ -468,7 +678,7 @@ function _acctRenamePrompt(id, currentName) {
   const newName = prompt('Rename "' + currentName + '" to (max 20 chars):', currentName);
   if (newName === null) return;
   if (!AccountManager.renameAccount(id, newName)) return;
-  _acctRefreshList();
+  _acctNav('list');
   _acctToast('Account renamed.');
 }
 
@@ -476,8 +686,34 @@ function _acctConfirmDelete(id, username) {
   if (!confirm('Delete account "' + username + '"?\nThis cannot be undone.')) return;
   const wasLast = AccountManager.getAllAccounts().length === 1;
   AccountManager.deleteAccount(id);
-  _acctRefreshList();
+  _acctNav('list');
   _acctToast(wasLast ? 'Account deleted. A new default account was created.' : 'Account deleted.');
+}
+
+// ── Style helpers ─────────────────────────────────────────────────────────────
+function _acctBtnStyle(type) {
+  const base = 'border-radius:6px;padding:5px 12px;cursor:pointer;font-size:0.78rem;';
+  if (type === 'blue')   return base + 'background:rgba(80,160,255,0.15);border:1px solid rgba(80,160,255,0.4);color:#88ccff;';
+  if (type === 'green')  return base + 'background:rgba(120,200,80,0.12);border:1px solid rgba(120,200,80,0.35);color:#aaffaa;';
+  if (type === 'red')    return base + 'background:rgba(255,60,60,0.12);border:1px solid rgba(255,80,80,0.35);color:#ff8888;';
+  if (type === 'purple') return base + 'background:rgba(180,80,255,0.12);border:1px solid rgba(180,100,255,0.35);color:#cc88ff;';
+  if (type === 'orange') return base + 'background:rgba(255,160,40,0.12);border:1px solid rgba(255,160,40,0.35);color:#ffbb66;';
+  return base + 'background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.18);color:#aab;';
+}
+
+function _acctInputStyle() {
+  return [
+    'width:100%',
+    'box-sizing:border-box',
+    'background:rgba(255,255,255,0.07)',
+    'border:1px solid rgba(100,180,255,0.3)',
+    'border-radius:7px',
+    'color:#dde4ff',
+    'padding:9px 12px',
+    'font-size:0.88rem',
+    "font-family:'Segoe UI',Arial,sans-serif",
+    'outline:none',
+  ].join(';');
 }
 
 // ── Safe string helpers ───────────────────────────────────────────────────────
@@ -485,22 +721,17 @@ function _acctEscHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 function _acctEscStr(s) {
-  // Used inside single-quoted JS attribute strings — escape ' and strip < >
   return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/[<>]/g,'');
 }
 function _acctEscId(s) {
-  // Account IDs are auto-generated alphanumeric+underscore — no escaping needed, but be safe
   return String(s).replace(/[^a-zA-Z0-9_]/g,'');
 }
 
 // ── hasPermission ─────────────────────────────────────────────────────────────
-// Check whether the active account has at least the given role level.
-// Levels (ascending): 'player' (default) < 'admin' < 'dev'
-// Accounts that predate the role field are treated as 'player'.
 function hasPermission(level) {
   const _ROLE_RANK = { player: 0, admin: 1, dev: 2 };
   const required = (_ROLE_RANK[level] !== undefined) ? _ROLE_RANK[level] : 999;
-  if (required === 0) return true; // 'player' level is always granted
+  if (required === 0) return true;
   const acct = (typeof AccountManager !== 'undefined') ? AccountManager.getActiveAccount() : null;
   if (!acct) return false;
   if (isSuperuserAccountId(acct.id)) return true;
@@ -525,8 +756,8 @@ function _acctToast(msg) {
     ].join(';');
     document.body.appendChild(t);
   }
-  t.textContent    = msg;
-  t.style.opacity  = '1';
+  t.textContent   = msg;
+  t.style.opacity = '1';
   clearTimeout(t._hideTimer);
   t._hideTimer = setTimeout(function() { t.style.opacity = '0'; }, 2200);
 }

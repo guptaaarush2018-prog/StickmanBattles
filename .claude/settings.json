@@ -3,7 +3,8 @@
     "allow": [
       "Bash(node --check /Users/aarushgupta/Documents/Stickman-Battles/server.js)",
       "Bash(node -e \"require\\('mime-types'\\); console.log\\('mime-types OK'\\)\" --require /Users/aarushgupta/Documents/Stickman-Battles/node_modules/mime-types)",
-      "Bash(node -e \"require\\('/Users/aarushgupta/Documents/Stickman-Battles/node_modules/mime-types'\\); console.log\\('mime-types OK'\\)\")"
+      "Bash(node -e \"require\\('/Users/aarushgupta/Documents/Stickman-Battles/node_modules/mime-types'\\); console.log\\('mime-types OK'\\)\")",
+      "Bash(node --check /Users/aarushgupta/Documents/Stickman-Battles/js/smb-accounts.js)"
     ]
   }
 }

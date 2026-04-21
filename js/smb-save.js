@@ -186,8 +186,12 @@ function _applySaveData(data) {
   else                               localStorage.removeItem('smc_storyDodgeUnlocked');
   if (d.unlocks.paradoxCompanion)   localStorage.setItem('smc_paradox_companion',  '1');
   else                               localStorage.removeItem('smc_paradox_companion');
-  if (d.story && typeof restoreStoryDataFromSave === 'function') {
-    restoreStoryDataFromSave(d.story);
+  if (typeof restoreStoryDataFromSave === 'function') {
+    // Always restore story data — fall back to default so switching to a new account
+    // (which has no story field) resets _story2 instead of leaving the old account's data.
+    const storyPayload = (d.story && d.story.defeated) ? d.story
+      : (typeof _defaultStory2Progress === 'function' ? _defaultStory2Progress() : null);
+    if (storyPayload) restoreStoryDataFromSave(storyPayload);
   }
 }
 
