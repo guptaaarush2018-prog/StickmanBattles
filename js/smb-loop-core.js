@@ -109,6 +109,10 @@ function gameLoop(timestamp) {
   if (typeof updateParadoxCompanion === 'function') updateParadoxCompanion();
   frameCount++;
   aiTick++;
+  // Once-per-second God encounter roll
+  if (frameCount % 60 === 0 && typeof updateGodEncounterTick === 'function') {
+    updateGodEncounterTick();
+  }
   // Approximate real delta-time at 60fps for Director
   if (typeof updateDirector === 'function') updateDirector(1/60);
 
@@ -442,6 +446,8 @@ function gameLoop(timestamp) {
   minions.forEach(m => { if (m.health > 0 && !tfAbsorptionScene) m.update(); });
   minions.forEach(m => { if (m.health > 0) m.draw(); });
   minions = minions.filter(m => m.health > 0);
+  // God death hook — triggers achievement when God is removed from minions
+  if (typeof _checkGodDeath === 'function') _checkGodDeath();
 
   // Training dummies / bots
   if (trainingMode) {

@@ -28,6 +28,8 @@ const _SAVE_DEFAULTS = {
     paradoxCompanion:   false,
     interTravel:        false,
     patrolMode:         false,
+    godEncountered:     false,
+    godDefeated:        false,
   },
   settings: {
     sfxVol:    0.35,
@@ -97,6 +99,8 @@ function _migrateSave(data) {
   if (typeof d.unlocks.paradoxCompanion   === 'undefined') d.unlocks.paradoxCompanion   = false;
   if (typeof d.unlocks.interTravel        === 'undefined') d.unlocks.interTravel        = false;
   if (typeof d.unlocks.patrolMode         === 'undefined') d.unlocks.patrolMode         = false;
+  if (typeof d.unlocks.godEncountered    === 'undefined') d.unlocks.godEncountered    = false;
+  if (typeof d.unlocks.godDefeated       === 'undefined') d.unlocks.godDefeated       = false;
   if (typeof d.coins !== 'number')     d.coins     = 0;
   if (!Array.isArray(d.cosmetics))     d.cosmetics = [];
   d.version = SAVE_VERSION;
@@ -167,6 +171,8 @@ function _gatherSaveData() {
                          ? !!GameState.getActiveAccount().data?.unlocks?.interTravel : false),
       patrolMode:      (typeof GameState !== 'undefined' && GameState.getActiveAccount()
                          ? !!GameState.getActiveAccount().data?.unlocks?.patrolMode : false),
+      godEncountered:  (typeof godEncountered !== 'undefined') ? !!godEncountered : false,
+      godDefeated:     (typeof godDefeated    !== 'undefined') ? !!godDefeated    : false,
     },
     coins:     (typeof playerCoins        !== 'undefined') ? playerCoins                  : 0,
     cosmetics: (typeof unlockedCosmetics  !== 'undefined') ? unlockedCosmetics.slice()    : [],
@@ -251,6 +257,9 @@ function _refreshRuntimeFromSave(data) {
     // New v3 runtime globals
     if (typeof sovereignBeaten !== 'undefined') sovereignBeaten = !!data.unlocks.sovereignBeaten;
     if (typeof storyOnline     !== 'undefined') storyOnline     = !!data.unlocks.storyOnline;
+    // God encounter flags
+    if (typeof godEncountered  !== 'undefined') godEncountered  = !!data.unlocks.godEncountered;
+    if (typeof godDefeated     !== 'undefined') godDefeated     = !!data.unlocks.godDefeated;
   }
 
   // Coins and cosmetics — new v3 fields

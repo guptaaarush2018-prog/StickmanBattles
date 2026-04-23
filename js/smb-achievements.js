@@ -29,6 +29,7 @@ const ACHIEVEMENTS = [
   { id: 'super_saver',    title: 'Super Saver',         desc: 'Use your super move 10 times',        icon: '⚡' },
   { id: 'speedrun',       title: 'Speedster',           desc: 'Win a match in under 30 seconds',     icon: '⏱' },
   { id: 'perfectionist',  title: 'Perfectionist',       desc: 'Win 10 total matches',                icon: '🌟' },
+  { id: 'god_slayer',     title: 'God Slayer',          desc: 'How did you do this!?!',              icon: '⚔️' },
 ];
 
 // Hydrated by _refreshRuntimeFromSave(); never read directly from localStorage

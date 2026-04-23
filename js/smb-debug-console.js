@@ -255,7 +255,8 @@ function _consoleExec(raw) {
       'gravity [n]             — set gravity multiplier (1=normal) [dev]',
       'noclip [p1|p2|on|off]   — toggle platform collision [dev]',
       '── Entities ─────────────────────────────────────────────────────',
-      'spawn <forestbeast|yeti|dummy> — spawn entity [dev]',
+      'spawn <forestbeast|yeti|dummy|god> — spawn entity [dev]',
+      'summon god — summon God entity (no crash behavior) [dev]',
       'bots reset              — reset all bot AI states',
       'bots kill               — kill all bots instantly',
       'boss phase <1|2|3>      — force boss to a phase [dev]',
@@ -378,7 +379,7 @@ function _consoleExec(raw) {
     if (typeof hasPermission === 'function' && !hasPermission('dev')) {
       _consoleErr('Permission denied — developer role required.'); return;
     }
-    if (!sub) { _consoleErr('Usage: spawn <forestbeast|yeti|boss|dummy>'); return; }
+    if (!sub) { _consoleErr('Usage: spawn <forestbeast|yeti|dummy|god>'); return; }
     if (typeof gameRunning === 'undefined' || !gameRunning) { _consoleErr('Start a game first.'); return; }
     if (sub === 'forestbeast' || sub === 'forest') {
       if (typeof ForestBeast !== 'undefined') {
@@ -399,7 +400,32 @@ function _consoleExec(raw) {
         trainingDummies.push(d);
         _consoleOk('Spawned Dummy');
       }
+    } else if (sub === 'god') {
+      if (typeof God !== 'undefined') {
+        const _g = new God(450, 200);
+        _g._teamId = 2;
+        _g._consoleSummoned = true; // suppress Phase 1 crash
+        minions.push(_g);
+        _consoleOk('Summoned God (no crash — dev mode)');
+      } else _consoleErr('God class not available.');
     } else { _consoleErr('Unknown entity: ' + sub); }
+    return;
+  }
+
+  // ---- SUMMON ----
+  if (cmd.startsWith('SUMMON')) {
+    if (typeof gameRunning === 'undefined' || !gameRunning) { _consoleErr('Start a game first.'); return; }
+    if (sub === 'god') {
+      if (typeof God !== 'undefined') {
+        const _g = new God(450, 200);
+        _g._teamId = 2;
+        _g._consoleSummoned = true; // suppress Phase 1 crash
+        minions.push(_g);
+        _consoleOk('Summoned God (no crash — dev mode)');
+      } else _consoleErr('God class not available.');
+    } else {
+      _consoleErr('Usage: summon god');
+    }
     return;
   }
 

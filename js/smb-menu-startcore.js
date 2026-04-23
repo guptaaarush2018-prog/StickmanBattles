@@ -17,6 +17,7 @@ function _startGameCore() {
   // Resolve arena
   const isBossMode         = gameMode === 'boss';
   const isTrueFormMode     = gameMode === 'trueform';
+  const isGodMode          = gameMode === 'god';
   const isDamnationMode    = gameMode === 'damnation';
   const isTrainingMode     = gameMode === 'training';
   // Online: force 2P-compatible variants so guest doesn't get assigned to boss/dummy
@@ -32,7 +33,9 @@ function _startGameCore() {
   _setBossFightLivesLock(isBossLivesMode);
   trainingMode = isTrainingMode;
   tutorialMode = false; // tutorial mode removed
-  if (isMultiverseMode) {
+  if (isGodMode) {
+    currentArenaKey = 'creator'; // reuse creator arena for the god encounter
+  } else if (isMultiverseMode) {
     const mvWorld = (typeof MultiverseManager !== 'undefined') ? MultiverseManager.getActiveWorld() : null;
     currentArenaKey = (mvWorld && mvWorld.arenaKey) ? mvWorld.arenaKey : 'homeAlley';
   } else if (isBossMode) {
@@ -446,6 +449,32 @@ function _startGameCore() {
       p1.target = null;
     }
     initMinigame();
+  } else if (isGodMode) {
+    // God encounter — P1 vs God (in minions), optional Paradox ally
+    p1.isAI  = false;
+    p1.lives = 10;
+    p1.armorPieces = ['helmet', 'chestplate', 'leggings']; // Godslayer armor
+    p1._teamId = 1;
+    if (window.GODSLAYER_WEAPON) {
+      p1.weapon    = window.GODSLAYER_WEAPON;
+      p1.weaponKey = '_godslayer';
+      p1._ammo     = 0;
+    }
+    players = [p1];
+    p1.target = null;
+    // Spawn God into minions
+    if (typeof God !== 'undefined') {
+      const _god = new God(700, 200);
+      _god._teamId = 2;
+      minions.push(_god);
+      if (typeof _godWasAlive !== 'undefined') _godWasAlive = true;
+    }
+    // Phase 2: spawn Paradox as ally
+    if (typeof _isGodPhase2 === 'function' && _isGodPhase2() && typeof GodParadoxAlly !== 'undefined') {
+      const _ally = new GodParadoxAlly(300, 200);
+      _ally._teamId = 1;
+      minions.push(_ally);
+    }
   } else if (isExploreMode) {
     // Exploration: P1 only — enemies are dynamically spawned as minions
     players = [p1];
@@ -614,7 +643,7 @@ function _startGameCore() {
     paradoxOnBossStart();
   }
   // Start appropriate background music
-  if (gameMode === 'boss' || gameMode === 'trueform') {
+  if (gameMode === 'boss' || gameMode === 'trueform' || gameMode === 'god') {
     MusicManager.playBoss();
   } else {
     MusicManager.playNormal();

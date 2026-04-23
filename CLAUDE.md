@@ -43,7 +43,7 @@ if (!boss || boss.health <= 0) return;
 ```
 
 ### 5. Never Bypass dealDamage()
-All damage must go through `dealDamage(attacker, target, dmg, kbForce)` in `smb-particles.js`. Never mutate `target.health` directly.
+All damage must go through `dealDamage(attacker, target, dmg, kbForce)` in `smb-combat.js`. Never mutate `target.health` directly.
 
 ### 6. Never Trigger Cinematics Inside dealDamage()
 Set a flag; trigger at frame start in `gameLoop`.
@@ -86,16 +86,35 @@ All docs are in `Stickman-Battles/docs/`.
 ## Running the Game
 
 ```bash
-# Serve from the active codebase directory
+# Install server dependencies (first time only)
+cd "Stickman-Battles" && npm install
+
+# Start the full server — serves game files AND the relay + moderation API
+cd "Stickman-Battles" && node server.js   # http://localhost:3001/index.html
+
+# Or serve static files only (no ban API / relay) — simpler for front-end work
 cd "Stickman-Battles" && python3 -m http.server 8080
 # Open: http://localhost:8080/index.html
 
 # Syntax-check a JS file
 node --check Stickman-Battles/js/smb-globals.js
-
-# Start optional multiplayer relay server
-cd "Stickman-Battles" && node server.js   # port 3001
 ```
+
+### Server details (`server.js` + `storage.js`)
+
+`server.js` runs two services on port 3001:
+- **Socket.io relay** — forwards `playerState` / `hitEvent` / `gameEvent` between room peers
+- **REST ban API** — cross-device persistent ban storage (`GET/POST/DELETE /api/bans`)
+
+Ban data is stored in `data.db` (SQLite via `better-sqlite3`); falls back to in-memory if SQLite fails.
+
+Environment variables:
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `PORT` | `3001` | Server port |
+| `ADMIN_KEY` | `smb-dev-key-change-me` | Required for write operations (`POST`/`DELETE /api/bans`) |
+
+`ADMIN_KEY` must match `SERVER_CONFIG.adminKey` in `js/smb-globals.js`.
 
 ---
 
@@ -271,6 +290,7 @@ Dependencies: GSAP 3.12.5 (CDN), PeerJS 1.5.4 (CDN).
 | `GameState` | Singleton (smb-state.js) — persistent account/session data; use `GameState.get/set/save()` |
 | `AccountManager` | Singleton (smb-accounts.js) — multi-account CRUD; depends on `GameState` |
 | `LobbyManager` | Singleton (smb-online.js) — lobby presence; sits on top of `NetworkManager` |
+| `SERVER_CONFIG` | (smb-globals.js) — `{ url, adminKey, syncIntervalMs }` — must match server's `ADMIN_KEY` |
 
 ---
 

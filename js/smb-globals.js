@@ -638,6 +638,8 @@ let storyDistortLevel  = 0;    // 0-1 world distortion intensity (rises with cha
 let storyDodgeUnlocked = false; // set true when DODGE_UNLOCK event fires
 let sovereignBeaten    = false; // set true after Sovereign MK2 is defeated
 let storyOnline        = false; // set true after online story completion
+let godEncountered     = false; // set true after first God encounter
+let godDefeated        = false; // set true after God is defeated in Phase 2
 let playerCoins        = 0;     // coin balance; hydrated per account
 let unlockedCosmetics  = [];    // cosmetic IDs; hydrated per account
 
@@ -799,6 +801,8 @@ function resetAccountScopedGlobals() {
   storyDodgeUnlocked = false;
   sovereignBeaten    = false;
   storyOnline        = false;
+  godEncountered     = false;
+  godDefeated        = false;
   playerCoins        = 0;
   unlockedCosmetics.length = 0;
   // paradoxCompanionActive — declared in smb-paradox-ai.js (loaded later); guarded
