@@ -423,8 +423,10 @@ function updateTFEnding() {
       sc.timer = 0;
       _tfeAuraParticles = [];
       sc.hero._tfAuraGlow = true;
-      localStorage.setItem('smc_patrolMode', '1');
-      localStorage.setItem('smc_interTravel', '1');
+      if (typeof setAccountFlag === 'function') {
+        setAccountFlag(['unlocks', 'patrolMode'],  true);
+        setAccountFlag(['unlocks', 'interTravel'], true);
+      }
       if (settings.experimental3D) localStorage.setItem('smc_view3D', '1');
       _tfeCamFocus(sc.hero.cx(), sc.hero.cy(), 1.5);
       sc.skippable = true;

@@ -388,7 +388,7 @@ function _startGameCore() {
     // Damnation scar bonus: surviving the echo gives 10% extra damage
     if (storyModeActive) {
       try {
-        if (localStorage.getItem('smb_damnationScar')) {
+        if (window.GameState && GameState.getActiveAccount()?.data?.unlocks?.damnationScar) {
           p1.dmgMult = (p1.dmgMult || 1.0) * 1.10;
           p1._hasDamnationScar = true;
         }

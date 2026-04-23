@@ -1,7 +1,7 @@
 // smc-save.js — Persistent save system: auto-save, export, import
 'use strict';
 
-const SAVE_VERSION = 2;
+const SAVE_VERSION = 3;
 const SAVE_KEY     = 'smc_save_v1'; // legacy fallback key (used when AccountManager is absent)
 
 // Dynamic key helpers — route through AccountManager when available so each
@@ -12,6 +12,8 @@ function _getBackupKey() { return _getSaveKey() + '_backup'; }
 // ── Default save structure (used for deep-merge / version migrations) ─────────
 const _SAVE_DEFAULTS = {
   version: SAVE_VERSION,
+  coins: 0,
+  cosmetics: [],
   unlocks: {
     bossBeaten:         false,
     trueform:           false,
@@ -24,6 +26,8 @@ const _SAVE_DEFAULTS = {
     damnationScar:      false,
     storyDodgeUnlocked: false,
     paradoxCompanion:   false,
+    interTravel:        false,
+    patrolMode:         false,
   },
   settings: {
     sfxVol:    0.35,
@@ -82,8 +86,19 @@ function _migrateSave(data) {
   if (typeof d.settings.ragdoll   === 'undefined') d.settings.ragdoll   = false;
   // ensure unlocks sub-object has all keys
   if (!d.unlocks) d.unlocks = {};
-  if (typeof d.unlocks.megaknight === 'undefined') d.unlocks.megaknight = false;
-  if (!Array.isArray(d.unlocks.achievements)) d.unlocks.achievements = [];
+  if (typeof d.unlocks.megaknight        === 'undefined') d.unlocks.megaknight        = false;
+  if (!Array.isArray(d.unlocks.achievements))             d.unlocks.achievements      = [];
+  // v2 → v3: new unlock flags, coins, cosmetics
+  if (typeof d.unlocks.sovereignBeaten    === 'undefined') d.unlocks.sovereignBeaten    = false;
+  if (typeof d.unlocks.storyOnline        === 'undefined') d.unlocks.storyOnline        = false;
+  if (typeof d.unlocks.tfEndingSeen       === 'undefined') d.unlocks.tfEndingSeen       = false;
+  if (typeof d.unlocks.damnationScar      === 'undefined') d.unlocks.damnationScar      = false;
+  if (typeof d.unlocks.storyDodgeUnlocked === 'undefined') d.unlocks.storyDodgeUnlocked = false;
+  if (typeof d.unlocks.paradoxCompanion   === 'undefined') d.unlocks.paradoxCompanion   = false;
+  if (typeof d.unlocks.interTravel        === 'undefined') d.unlocks.interTravel        = false;
+  if (typeof d.unlocks.patrolMode         === 'undefined') d.unlocks.patrolMode         = false;
+  if (typeof d.coins !== 'number')     d.coins     = 0;
+  if (!Array.isArray(d.cosmetics))     d.cosmetics = [];
   d.version = SAVE_VERSION;
   return d;
 }
@@ -141,12 +156,20 @@ function _gatherSaveData() {
       // Extended unlocks with runtime globals
       storyDodgeUnlocked: (typeof storyDodgeUnlocked    !== 'undefined') ? !!storyDodgeUnlocked    : false,
       paradoxCompanion:   (typeof paradoxCompanionActive !== 'undefined') ? !!paradoxCompanionActive : false,
-      // Extended unlocks — no runtime global; localStorage is the only source until they get one
-      sovereignBeaten: !!localStorage.getItem('smc_sovereignBeaten'),
-      storyOnline:     !!localStorage.getItem('smc_storyOnline'),
-      tfEndingSeen:    (localStorage.getItem('smc_tfEndingSeen') === '1'),
-      damnationScar:   !!localStorage.getItem('smb_damnationScar'),
+      // Extended unlocks — sourced from runtime globals (hydrated by _refreshRuntimeFromSave)
+      sovereignBeaten: (typeof sovereignBeaten !== 'undefined') ? !!sovereignBeaten : false,
+      storyOnline:     (typeof storyOnline     !== 'undefined') ? !!storyOnline     : false,
+      tfEndingSeen:    (typeof GameState !== 'undefined' && GameState.getActiveAccount()
+                         ? !!GameState.getActiveAccount().data?.unlocks?.tfEndingSeen : false),
+      damnationScar:   (typeof GameState !== 'undefined' && GameState.getActiveAccount()
+                         ? !!GameState.getActiveAccount().data?.unlocks?.damnationScar : false),
+      interTravel:     (typeof GameState !== 'undefined' && GameState.getActiveAccount()
+                         ? !!GameState.getActiveAccount().data?.unlocks?.interTravel : false),
+      patrolMode:      (typeof GameState !== 'undefined' && GameState.getActiveAccount()
+                         ? !!GameState.getActiveAccount().data?.unlocks?.patrolMode : false),
     },
+    coins:     (typeof playerCoins        !== 'undefined') ? playerCoins                  : 0,
+    cosmetics: (typeof unlockedCosmetics  !== 'undefined') ? unlockedCosmetics.slice()    : [],
     settings: {
       sfxVol:    parseFloat(localStorage.getItem('smc_sfxVol') || '0.35'),
       sfxMute:   (localStorage.getItem('smc_sfxMute')    === '1'),
@@ -201,6 +224,12 @@ function _applySaveData(data) {
 function _refreshRuntimeFromSave(data) {
   if (!data) return;
 
+  // Skip if we already hydrated this account — prevents redundant re-runs within a session.
+  // Keyed by account ID (not a boolean) so account switches automatically pass through.
+  const _acct = window.GameState ? GameState.getActiveAccount() : null;
+  const _acctId = _acct ? _acct.id : null;
+  if (_acctId && _acctId === _hydratedAccountId) return;
+
   // ── Reset phase: bring all account-specific globals to their initial defaults
   // before applying save data. This ensures no previous account's state bleeds
   // through when the incoming data is sparse or omits a field entirely.
@@ -209,8 +238,8 @@ function _refreshRuntimeFromSave(data) {
 
   // Unlock globals — smb-globals.js
   if (data.unlocks) {
-    if (typeof bossBeaten        !== 'undefined') bossBeaten        = !!data.unlocks.bossBeaten;
-    if (typeof unlockedTrueBoss  !== 'undefined') unlockedTrueBoss  = !!data.unlocks.trueform;
+    if (typeof bossBeaten         !== 'undefined') bossBeaten         = !!data.unlocks.bossBeaten;
+    if (typeof unlockedTrueBoss   !== 'undefined') unlockedTrueBoss   = !!data.unlocks.trueform;
     if (typeof unlockedMegaknight !== 'undefined') unlockedMegaknight = !!data.unlocks.megaknight;
     if (typeof collectedLetterIds !== 'undefined' && Array.isArray(data.unlocks.letters)) {
       collectedLetterIds.clear();
@@ -219,6 +248,16 @@ function _refreshRuntimeFromSave(data) {
     // Extended runtime globals reset by resetAccountScopedGlobals() above; restore here
     if (typeof storyDodgeUnlocked    !== 'undefined') storyDodgeUnlocked    = !!data.unlocks.storyDodgeUnlocked;
     if (typeof paradoxCompanionActive !== 'undefined') paradoxCompanionActive = !!data.unlocks.paradoxCompanion;
+    // New v3 runtime globals
+    if (typeof sovereignBeaten !== 'undefined') sovereignBeaten = !!data.unlocks.sovereignBeaten;
+    if (typeof storyOnline     !== 'undefined') storyOnline     = !!data.unlocks.storyOnline;
+  }
+
+  // Coins and cosmetics — new v3 fields
+  if (typeof playerCoins !== 'undefined')       playerCoins       = (typeof data.coins === 'number') ? data.coins : 0;
+  if (typeof unlockedCosmetics !== 'undefined' && Array.isArray(data.cosmetics)) {
+    unlockedCosmetics.length = 0;
+    data.cosmetics.forEach(function(id) { unlockedCosmetics.push(id); });
   }
 
   // Achievement Set — smb-achievements.js
@@ -275,7 +314,142 @@ function _refreshRuntimeFromSave(data) {
 
   // Sync secret-letter UI (no-op if still in loading phase)
   if (typeof syncCodeInput === 'function') syncCodeInput();
+
+  // Mark this account as hydrated — guards against redundant re-runs this session
+  if (_acctId) _hydratedAccountId = _acctId;
 }
+
+// ── Debounced save ────────────────────────────────────────────────────────────
+let _saveQueued = false;
+let _saveTimer  = null;
+let _flushInProgress = false;
+
+function queueGameStateSave() {
+  if (_saveQueued) return;
+  _saveQueued = true;
+  _saveTimer = setTimeout(function() {
+    if (window.GameState) GameState.save();
+    _saveQueued = false;
+    _saveTimer  = null;
+  }, 50);
+}
+
+// ── Account flag setters ──────────────────────────────────────────────────────
+function setAccountFlag(path, value, acctOverride) {
+  const acct = acctOverride || (window.GameState ? GameState.getActiveAccount() : null);
+  if (!acct) return;
+  let ref = acct.data;
+  if (!ref) return;
+  for (let i = 0; i < path.length - 1; i++) {
+    if (typeof ref[path[i]] !== 'object' || ref[path[i]] === null) {
+      ref[path[i]] = {};
+    }
+    ref = ref[path[i]];
+  }
+  ref[path[path.length - 1]] = value;
+  queueGameStateSave();
+}
+
+function setAccountFlagWithRuntime(path, value, runtimeSetter) {
+  const acct = window.GameState ? GameState.getActiveAccount() : null;
+  if (!acct) return;
+  runtimeSetter(value);
+  try {
+    setAccountFlag(path, value, acct);
+  } catch(e) {
+    console.error('[save] Failed to persist flag:', path, e);
+  }
+}
+
+// ── Coin update ───────────────────────────────────────────────────────────────
+function updateCoins(fn, _retry) {
+  const base = (typeof playerCoins !== 'undefined') ? playerCoins : 0;
+  const next = fn(base);
+  if (typeof next !== 'number' || !isFinite(next)) {
+    console.warn('[coins] Invalid coin update result:', next);
+    return;
+  }
+  const clamped = Math.max(0, Math.floor(next));
+  if (!_retry && typeof playerCoins !== 'undefined' && base !== playerCoins) {
+    return updateCoins(fn, true);
+  }
+  setAccountFlagWithRuntime(['coins'], clamped, function(v) {
+    if (typeof playerCoins !== 'undefined') playerCoins = v;
+  });
+}
+
+// ── Collection wrappers ───────────────────────────────────────────────────────
+function addCosmetic(id) {
+  if (typeof unlockedCosmetics === 'undefined') return;
+  if (unlockedCosmetics.indexOf(id) !== -1) return;
+  unlockedCosmetics.push(id);
+  setAccountFlag(['cosmetics'], unlockedCosmetics.slice());
+}
+
+function addAchievement(id) {
+  if (typeof earnedAchievements === 'undefined') return;
+  if (earnedAchievements.has(id)) return;
+  earnedAchievements.add(id);
+  setAccountFlag(['unlocks', 'achievements'], Array.from(earnedAchievements));
+}
+
+function addLetter(id) {
+  if (typeof collectedLetterIds === 'undefined') return;
+  if (collectedLetterIds.has(id)) return;
+  collectedLetterIds.add(id);
+  setAccountFlag(['unlocks', 'letters'], Array.from(collectedLetterIds));
+}
+
+// ── Legacy key cleanup ────────────────────────────────────────────────────────
+const _LEGACY_ACCOUNT_KEYS = [
+  'smc_sovereignBeaten', 'smc_storyOnline', 'smc_storyDodgeUnlocked',
+  'smc_paradox_companion', 'smb_coins', 'smb_unlocked_cosmetics',
+  'smc_tfEndingSeen', 'smb_damnationScar', 'smc_interTravel', 'smc_patrolMode',
+  'smc_bossBeaten', 'smc_trueform', 'smc_letters', 'smc_megaknight',
+  'smc_achievements',
+];
+
+function _clearLegacyKeys() {
+  _LEGACY_ACCOUNT_KEYS.forEach(function(k) {
+    try { localStorage.removeItem(k); } catch(e) {}
+  });
+}
+
+// ── Rehydration guard (keyed by account ID, not a boolean) ───────────────────
+let _hydratedAccountId = null;
+
+function forceRehydrateFromAccount(acct) {
+  _hydratedAccountId = null;
+  _refreshRuntimeFromSave(acct ? acct.data : null);
+}
+
+// ── Dev guard: warn on stale localStorage reads for account-scoped keys ───────
+function _guardLocalStorageRead(key) {
+  if (_LEGACY_ACCOUNT_KEYS.indexOf(key) !== -1) {
+    console.warn('[storage] Blocked localStorage read for account-scoped key:', key,
+      '— use runtime globals instead.');
+  }
+}
+
+// ── Flush hooks (beforeunload + visibilitychange) ─────────────────────────────
+(function() {
+  function _flushSave() {
+    if (_flushInProgress) return;
+    _flushInProgress = true;
+    clearTimeout(_saveTimer);
+    _saveTimer  = null;
+    _saveQueued = false;
+    if (window.GameState) {
+      try { GameState.save(); } catch(e) {}
+    }
+    // Reset flag after a tick so the handler can fire again after navigation (e.g. spa reload)
+    setTimeout(function() { _flushInProgress = false; }, 200);
+  }
+  window.addEventListener('beforeunload',    _flushSave);
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'hidden') _flushSave();
+  });
+})();
 
 // ── Save ──────────────────────────────────────────────────────────────────────
 // _SAVE_BACKUP_KEY is now computed dynamically via _getBackupKey()
@@ -286,6 +460,8 @@ function saveGame() {
     const acct = GameState.getActiveAccount();
     if (!acct) return;
     const data = _gatherSaveData();
+    // Preserve the _legacyCleared flag so cleanup is not undone on next load
+    if (acct.data && acct.data._legacyCleared) data._legacyCleared = true;
     GameState.update(function(s) {
       const a = s.persistent.accounts[s.persistent.activeAccountId];
       if (a) a.data = data;
@@ -304,6 +480,15 @@ function loadGame() {
     // ── Primary path: account.data in GameState ───────────────────────────────
     if (acct && acct.data && typeof acct.data.version === 'number') {
       const data = acct.data.version < SAVE_VERSION ? _migrateSave(acct.data) : acct.data;
+      // One-time legacy key cleanup per account (committed synchronously before removeItem)
+      if (!acct.data._legacyCleared) {
+        GameState.update(function(s) {
+          const a = s.persistent.accounts[s.persistent.activeAccountId];
+          if (a && a.data) a.data._legacyCleared = true;
+        });
+        GameState.save();
+        _clearLegacyKeys();
+      }
       _applySaveData(data);
       _refreshRuntimeFromSave(data);
       return;

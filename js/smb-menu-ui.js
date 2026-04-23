@@ -225,7 +225,8 @@ const COSMETIC_CATALOG = [
 ];
 
 // ---- Coin balance ----
-let coinBalance = parseInt(localStorage.getItem('smb_coins') || '0', 10);
+// Sourced from playerCoins global (hydrated by _refreshRuntimeFromSave)
+let coinBalance = (typeof playerCoins !== 'undefined') ? playerCoins : 0;
 
 function _syncCoinDisplay() {
   const storeBal = document.getElementById('storeCoinBalance');
@@ -244,8 +245,12 @@ function getCoinBalance() {
 
 function setCoinBalance(value) {
   const next = Math.max(0, Math.floor(Number(value) || 0));
-  coinBalance = next;
-  localStorage.setItem('smb_coins', String(coinBalance));
+  if (typeof updateCoins === 'function') {
+    updateCoins(function() { return next; });
+    coinBalance = next;
+  } else {
+    coinBalance = next;
+  }
   _syncCoinDisplay();
   return coinBalance;
 }
@@ -254,19 +259,14 @@ function awardCoins(n) {
   return setCoinBalance(coinBalance + (Number(n) || 0));
 }
 
-// ---- Unlocked cosmetics (persisted) ----
-let _unlockedSet = null;
+// ---- Unlocked cosmetics (sourced from unlockedCosmetics global) ----
 function _getUnlocked() {
-  if (!_unlockedSet) {
-    try { _unlockedSet = new Set(JSON.parse(localStorage.getItem('smb_unlocked_cosmetics') || '[]')); }
-    catch(e) { _unlockedSet = new Set(); }
-  }
-  return _unlockedSet;
+  return typeof unlockedCosmetics !== 'undefined' ? unlockedCosmetics : [];
 }
 function isCosmeticUnlocked(id) {
   const entry = COSMETIC_CATALOG.find(c => c.id === id);
   if (!entry || entry.price === 0) return true;
-  return _getUnlocked().has(id);
+  return _getUnlocked().indexOf(id) !== -1;
 }
 function unlockCosmetic(id) {
   const entry = COSMETIC_CATALOG.find(c => c.id === id);
@@ -274,8 +274,9 @@ function unlockCosmetic(id) {
   if (isCosmeticUnlocked(id)) return true;
   if (coinBalance < entry.price) return false;
   setCoinBalance(coinBalance - entry.price);
-  _getUnlocked().add(id);
-  localStorage.setItem('smb_unlocked_cosmetics', JSON.stringify([..._getUnlocked()]));
+  if (typeof addCosmetic === 'function') {
+    addCosmetic(id);
+  }
   return true;
 }
 

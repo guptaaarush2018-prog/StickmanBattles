@@ -37,10 +37,13 @@ document.addEventListener('keydown', e => {
     if (_cheatBuffer.endsWith('TRUEFORM')) {
       _cheatBuffer = '';
       if (!unlockedTrueBoss) {
-        unlockedTrueBoss = true;
-        localStorage.setItem('smc_trueform', '1');
-        localStorage.setItem('smc_letters', JSON.stringify([0,1,2,3,4,5,6,7]));
-        collectedLetterIds = new Set([0,1,2,3,4,5,6,7]);
+        if (typeof setAccountFlagWithRuntime === 'function') {
+          setAccountFlagWithRuntime(['unlocks', 'trueform'], true, function(v) { unlockedTrueBoss = v; });
+          [0,1,2,3,4,5,6,7].forEach(function(id) { if (typeof addLetter === 'function') addLetter(id); });
+        } else {
+          unlockedTrueBoss = true;
+          [0,1,2,3,4,5,6,7].forEach(function(id) { collectedLetterIds.add(id); });
+        }
         syncCodeInput();
         const card = document.getElementById('modeTrueForm');
         if (card) card.style.display = '';
@@ -58,8 +61,12 @@ document.addEventListener('keydown', e => {
     // SOVEREIGN cheat: type UNLOCKSOVEREIGN in menu
     if (_cheatBuffer.endsWith('UNLOCKSOVEREIGN')) {
       _cheatBuffer = '';
-      if (!localStorage.getItem('smc_sovereignBeaten')) {
-        localStorage.setItem('smc_sovereignBeaten', '1');
+      if (!sovereignBeaten) {
+        if (typeof setAccountFlagWithRuntime === 'function') {
+          setAccountFlagWithRuntime(['unlocks', 'sovereignBeaten'], true, function(v) { sovereignBeaten = v; });
+        } else {
+          sovereignBeaten = true;
+        }
         const adCard  = document.getElementById('modeAdaptive');
         const sovCard = document.getElementById('modeSovereign');
         if (adCard)  adCard.style.display  = '';
@@ -74,8 +81,11 @@ document.addEventListener('keydown', e => {
     // MEGAKNIGHT cheat: type CLASSMEGAKNIGHT in menu
     if (_cheatBuffer.endsWith('CLASSMEGAKNIGHT')) {
       _cheatBuffer = '';
-      unlockedMegaknight = true;
-      localStorage.setItem('smc_megaknight', '1');
+      if (typeof setAccountFlagWithRuntime === 'function') {
+        setAccountFlagWithRuntime(['unlocks', 'megaknight'], true, function(v) { unlockedMegaknight = v; });
+      } else {
+        unlockedMegaknight = true;
+      }
       ['p1Class','p2Class'].forEach(id => {
         const sel = document.getElementById(id);
         if (sel && !sel.querySelector('option[value="megaknight"]')) {

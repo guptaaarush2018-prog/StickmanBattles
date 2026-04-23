@@ -71,7 +71,7 @@ function refreshMenuFromAccount() {
   if (tfCard) tfCard.style.display = (typeof unlockedTrueBoss !== 'undefined' && unlockedTrueBoss) ? '' : 'none';
 
   const sovCard = document.getElementById('modeSovereign');
-  if (sovCard) sovCard.style.display = localStorage.getItem('smc_sovereignBeaten') ? '' : 'none';
+  if (sovCard) sovCard.style.display = (typeof sovereignBeaten !== 'undefined' && sovereignBeaten) ? '' : 'none';
 
   if (typeof syncCodeInput === 'function') syncCodeInput();
 }

@@ -237,13 +237,15 @@ function startTFEnding(boss, isIntro) {
     // skip
     skippable: false,
     skipped:   false,
-    canReplay:  (localStorage.getItem('smc_tfEndingSeen') === '1'),
+    canReplay:  !!(window.GameState && GameState.getActiveAccount()?.data?.unlocks?.tfEndingSeen),
 
     // intro mode: resume gameplay instead of calling endGame
     isIntro: isIntro === true,
   };
 
-  localStorage.setItem('smc_tfEndingSeen', '1');
+  if (typeof setAccountFlag === 'function') {
+    setAccountFlag(['unlocks', 'tfEndingSeen'], true);
+  }
   hero.backstageHiding = false;
   screenShake = 20;
 }

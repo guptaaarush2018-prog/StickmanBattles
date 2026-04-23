@@ -31,7 +31,8 @@ const ACHIEVEMENTS = [
   { id: 'perfectionist',  title: 'Perfectionist',       desc: 'Win 10 total matches',                icon: '🌟' },
 ];
 
-let earnedAchievements = new Set(JSON.parse(localStorage.getItem('smc_achievements') || '[]'));
+// Hydrated by _refreshRuntimeFromSave(); never read directly from localStorage
+let earnedAchievements = new Set();
 let achievementQueue   = []; // pending popup animations
 let achievementTimer   = 0;  // frames remaining for current popup
 
@@ -44,10 +45,13 @@ function unlockAchievement(id) {
   if (earnedAchievements.has(id)) return;
   const def = ACHIEVEMENTS.find(a => a.id === id);
   if (!def) return;
-  earnedAchievements.add(id);
-  localStorage.setItem('smc_achievements', JSON.stringify([...earnedAchievements]));
-  // Persist immediately to GameState (account-isolated)
-  if (typeof saveGame === 'function') saveGame();
+  if (typeof addAchievement === 'function') {
+    addAchievement(id);
+  } else {
+    earnedAchievements.add(id);
+  }
+  // Persist via debounced queue (addAchievement calls queueGameStateSave)
+  if (typeof addAchievement !== 'function' && typeof saveGame === 'function') saveGame();
   // Online: sync achievements between players
   if (onlineMode && NetworkManager.connected) {
     NetworkManager.sendGameEvent('achievementUnlocked', { id });

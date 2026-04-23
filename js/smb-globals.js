@@ -317,7 +317,7 @@ let bgBuildings = [];
 // ============================================================
 // TRUE FORM BOSS STATE
 // ============================================================
-let unlockedTrueBoss   = !!localStorage.getItem('smc_trueform');
+let unlockedTrueBoss   = false;
 let tfGravityInverted  = false;
 let tfGravityTimer     = 0;    // countdown (frames); 0 = gravity normal
 
@@ -417,8 +417,8 @@ let bossDesperationFlash = 0;   // visual flash timer on activate
 // ============================================================
 // SECRET LETTER HUNT
 // ============================================================
-let bossBeaten         = !!localStorage.getItem('smc_bossBeaten');
-let collectedLetterIds = new Set(JSON.parse(localStorage.getItem('smc_letters') || '[]'));
+let bossBeaten         = false;
+let collectedLetterIds = new Set();
 // 0 = fresh player, 1 = boss beaten, 2 = true form unlocked
 // let (not const) so _refreshRuntimeFromSave() can recalculate after account switch
 let playerProgressLevel = unlockedTrueBoss ? 2 : bossBeaten ? 1 : 0;
@@ -463,7 +463,7 @@ let onlineMaxPlayers = 10;
 let onlineFreeCamera = false; // in online mode, camera tracks only local player
 let onlineCamX = 450, onlineCamY = 260; // free camera target position for online mode
 let _cheatBuffer     = ''; // tracks recent keypresses for cheat codes
-let unlockedMegaknight = (localStorage.getItem('smc_megaknight') === '1');
+let unlockedMegaknight = false;
 // Public room browser state
 let _publicRooms     = [];  // [{code, host, created}] — discovered public rooms
 let _isPublicRoom    = false; // whether current hosted room is public
@@ -636,6 +636,10 @@ let storyEventFired    = {};   // { [eventName]: true } — dedup per fight
 let storyFreezeTimer   = 0;    // frames of physics halt for cinematic freezes
 let storyDistortLevel  = 0;    // 0-1 world distortion intensity (rises with chapter progress)
 let storyDodgeUnlocked = false; // set true when DODGE_UNLOCK event fires
+let sovereignBeaten    = false; // set true after Sovereign MK2 is defeated
+let storyOnline        = false; // set true after online story completion
+let playerCoins        = 0;     // coin balance; hydrated per account
+let unlockedCosmetics  = [];    // cosmetic IDs; hydrated per account
 
 // ── Ability unlock toast ─────────────────────────────────────────────────
 let abilityUnlockToast = null;  // { text, icon, timer, maxTimer }
@@ -793,6 +797,10 @@ function resetProgressionGlobals() {
 function resetAccountScopedGlobals() {
   // storyDodgeUnlocked — declared in this file; always safe
   storyDodgeUnlocked = false;
-  // paradoxCompanionActive — declared in smb-paradox.js (loaded later); guarded
+  sovereignBeaten    = false;
+  storyOnline        = false;
+  playerCoins        = 0;
+  unlockedCosmetics.length = 0;
+  // paradoxCompanionActive — declared in smb-paradox-ai.js (loaded later); guarded
   if (typeof paradoxCompanionActive !== 'undefined') paradoxCompanionActive = false;
 }

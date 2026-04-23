@@ -70,6 +70,31 @@ const AccountManager = (() => {
       });
     }
 
+    // Migration: ensure every account.data has v3 fields (coins, cosmetics, extended unlocks)
+    if (p.accounts && Object.values(p.accounts).some(function(a) {
+      return a.data && (typeof a.data.coins !== 'number' || !Array.isArray(a.data.cosmetics) ||
+        (a.data.unlocks && typeof a.data.unlocks.sovereignBeaten === 'undefined'));
+    })) {
+      GameState.update(function(s) {
+        Object.values(s.persistent.accounts || {}).forEach(function(a) {
+          if (!a.data) return;
+          if (typeof a.data.coins !== 'number') a.data.coins = 0;
+          if (!Array.isArray(a.data.cosmetics)) a.data.cosmetics = [];
+          if (typeof a.data._legacyCleared !== 'boolean') a.data._legacyCleared = false;
+          if (!a.data.unlocks) a.data.unlocks = {};
+          var u = a.data.unlocks;
+          if (typeof u.sovereignBeaten    === 'undefined') u.sovereignBeaten    = false;
+          if (typeof u.storyOnline        === 'undefined') u.storyOnline        = false;
+          if (typeof u.tfEndingSeen       === 'undefined') u.tfEndingSeen       = false;
+          if (typeof u.damnationScar      === 'undefined') u.damnationScar      = false;
+          if (typeof u.storyDodgeUnlocked === 'undefined') u.storyDodgeUnlocked = false;
+          if (typeof u.paradoxCompanion   === 'undefined') u.paradoxCompanion   = false;
+          if (typeof u.interTravel        === 'undefined') u.interTravel        = false;
+          if (typeof u.patrolMode         === 'undefined') u.patrolMode         = false;
+        });
+      });
+    }
+
     // Migration: ensure every account has an auth field (passwords + lock state)
     if (p.accounts && Object.values(p.accounts).some(function(a) { return !a.auth; })) {
       GameState.update(function(s) {
@@ -139,7 +164,7 @@ const AccountManager = (() => {
         createdAt: Date.now(),
         saveKey:   'smb_acct_' + id,
         role:      'player',
-        data:      { version: (typeof SAVE_VERSION !== 'undefined' ? SAVE_VERSION : 2), progression: {}, stats: {}, unlocks: { bossBeaten: false, trueform: false, megaknight: false, letters: [], achievements: [] }, settings: { sfxVol: 0.35, sfxMute: false, musicMute: false, ragdoll: false } },
+        data:      { version: (typeof SAVE_VERSION !== 'undefined' ? SAVE_VERSION : 3), progression: {}, stats: {}, coins: 0, cosmetics: [], _legacyCleared: false, unlocks: { bossBeaten: false, trueform: false, megaknight: false, letters: [], achievements: [], sovereignBeaten: false, storyOnline: false, tfEndingSeen: false, damnationScar: false, storyDodgeUnlocked: false, paradoxCompanion: false, interTravel: false, patrolMode: false }, settings: { sfxVol: 0.35, sfxMute: false, musicMute: false, ragdoll: false } },
       };
     });
     _persist();

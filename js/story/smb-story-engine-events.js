@@ -3,7 +3,7 @@
 // Depends on: smb-globals.js, smb-story-registry.js (and preceding story-engine splits)
 
 (function _story2Init() {
-  if (_story2.storyComplete || localStorage.getItem('smc_storyOnline')) {
+  if (_story2.storyComplete || (typeof storyOnline !== 'undefined' && storyOnline)) {
     const soCard = document.getElementById('modeStoryOnline');
     if (soCard) soCard.style.display = '';
   }
@@ -46,7 +46,7 @@ const storyState = {
   storyState.abilities.doubleJump    = !!sk.doubleJump;
   storyState.abilities.weaponAbility = !!(sk.weaponAbility || sk.weaponAbilityOld);
   storyState.abilities.superMeter    = !!sk.superMeter;
-  storyState.abilities.dodge         = !!sk.dodge || !!localStorage.getItem('smc_storyDodgeUnlocked');
+  storyState.abilities.dodge         = !!sk.dodge || (typeof storyDodgeUnlocked !== 'undefined' && storyDodgeUnlocked);
   storyDodgeUnlocked                 = storyState.abilities.dodge;
 })();
 
@@ -110,8 +110,11 @@ function _handleBuiltinEvent(name, data) {
       // Ch 9+ → unlock dodge if not yet unlocked
       if (!storyState.abilities.dodge && storyState.chapter >= 9) {
         storyState.abilities.dodge = true;
-        storyDodgeUnlocked = true;
-        localStorage.setItem('smc_storyDodgeUnlocked', '1');
+        if (typeof setAccountFlagWithRuntime === 'function') {
+          setAccountFlagWithRuntime(['unlocks', 'storyDodgeUnlocked'], true, function(v) { storyDodgeUnlocked = v; });
+        } else {
+          storyDodgeUnlocked = true;
+        }
         _showMidFightUnlock({
           icon: '💨',
           name: 'Dodge Roll',

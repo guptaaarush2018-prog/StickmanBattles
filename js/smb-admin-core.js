@@ -489,12 +489,15 @@ function unlockAllItems(accountId) {
   const allLetters = [0, 1, 2, 3, 4, 5, 6, 7];
 
   if (_adminIsActive(accountId)) {
-    // Set individual localStorage keys (source of truth for live game state).
-    localStorage.setItem('smc_bossBeaten',  '1');
-    localStorage.setItem('smc_trueform',    '1');
-    localStorage.setItem('smc_megaknight',  '1');
-    localStorage.setItem('smc_letters', JSON.stringify(allLetters));
-    localStorage.setItem('smc_achievements', JSON.stringify(_ADMIN_ALL_ACH_IDS));
+    // Route all writes through the account-flag system
+    if (typeof setAccountFlagWithRuntime === 'function') {
+      setAccountFlagWithRuntime(['unlocks', 'bossBeaten'],  true, function(v) { bossBeaten = v; });
+      setAccountFlagWithRuntime(['unlocks', 'trueform'],    true, function(v) { unlockedTrueBoss = v; });
+      setAccountFlagWithRuntime(['unlocks', 'megaknight'],  true, function(v) { unlockedMegaknight = v; });
+    } else {
+      bossBeaten = true; unlockedTrueBoss = true; unlockedMegaknight = true;
+    }
+    allLetters.forEach(function(id) { if (typeof addLetter === 'function') addLetter(id); });
     // Unlock achievements via the live function so in-memory Set stays in sync.
     if (typeof unlockAchievement === 'function') {
       _ADMIN_ALL_ACH_IDS.forEach(function(id) { unlockAchievement(id); });

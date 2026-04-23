@@ -78,7 +78,7 @@ STORY_CHAPTER_REGISTRY.push(
     ],
     tokenReward: 150,
     onComplete: function() {
-      try { localStorage.setItem('smb_damnationScar', '1'); } catch(e) {}
+      if (typeof setAccountFlag === 'function') { setAccountFlag(['unlocks', 'damnationScar'], true); }
     },
     postText: 'The void ahead is the same. You are not. The True Form is waiting — and it already knows you survived its echo. The compass burns. Forward.',
   },

@@ -290,8 +290,8 @@ function paradoxPlayerUseAbility(fighter) {
 // after the TrueForm ending. No UI, no spam.
 // ============================================================
 
-// Read persisted flag once on load
-let paradoxCompanionActive = localStorage.getItem('smc_paradox_companion') === '1';
+// Hydrated by _refreshRuntimeFromSave(); never read directly from localStorage
+let paradoxCompanionActive = false;
 
 // Internal state
 let _pdxCompIdleTimer    = 0;   // counts up; fires a line at threshold
@@ -341,8 +341,11 @@ function paradoxSpeak(line) {
  */
 function activateParadoxCompanion() {
   if (paradoxCompanionActive) return;
-  paradoxCompanionActive = true;
-  localStorage.setItem('smc_paradox_companion', '1');
+  if (typeof setAccountFlagWithRuntime === 'function') {
+    setAccountFlagWithRuntime(['unlocks', 'paradoxCompanion'], true, function(v) { paradoxCompanionActive = v; });
+  } else {
+    paradoxCompanionActive = true;
+  }
 }
 
 /**

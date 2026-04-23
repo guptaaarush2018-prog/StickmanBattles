@@ -1090,8 +1090,12 @@ function endGame() {
     if (achievWinner.weaponKey === 'hammer') unlockAchievement('hammer_time');
     // Boss slayer achievements are intentionally unobtainable
     // SOVEREIGN beaten — unlock the SOVEREIGN mode card
-    if (gameMode === 'adaptive' && !localStorage.getItem('smc_sovereignBeaten')) {
-      localStorage.setItem('smc_sovereignBeaten', '1');
+    if (gameMode === 'adaptive' && !sovereignBeaten) {
+      if (typeof setAccountFlagWithRuntime === 'function') {
+        setAccountFlagWithRuntime(['unlocks', 'sovereignBeaten'], true, function(v) { sovereignBeaten = v; });
+      } else {
+        sovereignBeaten = true;
+      }
       const _s2Card = document.getElementById('modeSovereign');
       if (_s2Card) _s2Card.style.display = '';
     }
@@ -1138,7 +1142,8 @@ function endGame() {
   // Show Replay Cinematic button if TF ending has been seen and this was a TF fight
   const _replayRow = document.getElementById('replayCinematicRow');
   if (_replayRow) {
-    _replayRow.style.display = (gameMode === 'trueform' && localStorage.getItem('smc_tfEndingSeen') === '1') ? '' : 'none';
+    _replayRow.style.display = (gameMode === 'trueform' && window.GameState &&
+      !!GameState.getActiveAccount()?.data?.unlocks?.tfEndingSeen) ? '' : 'none';
   }
 
   // Story mode: detect win and show level-complete screen
@@ -1184,8 +1189,11 @@ function syncCodeInput() {
 
 function unlockTrueForm() {
   if (unlockedTrueBoss) return;
-  unlockedTrueBoss = true;
-  localStorage.setItem('smc_trueform', '1');
+  if (typeof setAccountFlagWithRuntime === 'function') {
+    setAccountFlagWithRuntime(['unlocks', 'trueform'], true, function(v) { unlockedTrueBoss = v; });
+  } else {
+    unlockedTrueBoss = true;
+  }
   const card = document.getElementById('modeTrueForm');
   if (card) { card.style.display = ''; }
   const msg = document.getElementById('codeMessage');
@@ -1235,8 +1243,11 @@ function checkSecretLetterCollect(p) {
   const pos = SECRET_LETTER_POS[currentArenaKey];
   if (!pos) return;
   if (Math.hypot(p.cx() - pos.x, p.cy() - pos.y) < 100) {
-    collectedLetterIds.add(idx);
-    localStorage.setItem('smc_letters', JSON.stringify([...collectedLetterIds]));
+    if (typeof addLetter === 'function') {
+      addLetter(idx);
+    } else {
+      collectedLetterIds.add(idx);
+    }
     spawnParticles(pos.x, pos.y, '#cc00ee', 18);
     syncCodeInput();
     if (collectedLetterIds.size === 8) unlockTrueForm();

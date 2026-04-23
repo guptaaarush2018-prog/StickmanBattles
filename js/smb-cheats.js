@@ -6,30 +6,37 @@
 // ============================================================
 function _cheatUnlockAll() {
   // Boss
-  bossBeaten = true;
-  localStorage.setItem('smc_bossBeaten', '1');
+  if (typeof setAccountFlagWithRuntime === 'function') {
+    setAccountFlagWithRuntime(['unlocks', 'bossBeaten'], true, function(v) { bossBeaten = v; });
+  } else { bossBeaten = true; }
   const bossCard = document.getElementById('modeBoss');
   if (bossCard) bossCard.style.display = '';
 
   // True Form
-  unlockedTrueBoss = true;
-  localStorage.setItem('smc_trueform', '1');
-  localStorage.setItem('smc_letters', JSON.stringify([0,1,2,3,4,5,6,7]));
-  collectedLetterIds = new Set([0,1,2,3,4,5,6,7]);
+  if (typeof setAccountFlagWithRuntime === 'function') {
+    setAccountFlagWithRuntime(['unlocks', 'trueform'], true, function(v) { unlockedTrueBoss = v; });
+    [0,1,2,3,4,5,6,7].forEach(function(id) { if (typeof addLetter === 'function') addLetter(id); });
+  } else {
+    unlockedTrueBoss = true;
+    [0,1,2,3,4,5,6,7].forEach(function(id) { collectedLetterIds.add(id); });
+  }
   syncCodeInput && syncCodeInput();
   const tfCard = document.getElementById('modeTrueForm');
   if (tfCard) tfCard.style.display = '';
 
   // Sovereign
-  localStorage.setItem('smc_sovereignBeaten', '1');
+  if (typeof setAccountFlagWithRuntime === 'function') {
+    setAccountFlagWithRuntime(['unlocks', 'sovereignBeaten'], true, function(v) { sovereignBeaten = v; });
+  } else { sovereignBeaten = true; }
   const _adCard  = document.getElementById('modeAdaptive');
   const _sovCard = document.getElementById('modeSovereign');
   if (_adCard)  _adCard.style.display  = '';
   if (_sovCard) _sovCard.style.display = '';
 
   // Megaknight
-  unlockedMegaknight = true;
-  localStorage.setItem('smc_megaknight', '1');
+  if (typeof setAccountFlagWithRuntime === 'function') {
+    setAccountFlagWithRuntime(['unlocks', 'megaknight'], true, function(v) { unlockedMegaknight = v; });
+  } else { unlockedMegaknight = true; }
   ['p1Class','p2Class'].forEach(id => {
     const sel = document.getElementById(id);
     if (sel && !sel.querySelector('option[value="megaknight"]')) {
@@ -110,21 +117,25 @@ function applyCode(val) {
   const err = (t) => { if (msgEl) { msgEl.textContent = '✗ ' + t; msgEl.style.color = '#ff4444'; msgEl.style.fontSize = ''; } };
 
   if (code === 'TRUEFORM') {
-    unlockedTrueBoss = true;
-    localStorage.setItem('smc_trueform','1');
+    if (typeof setAccountFlagWithRuntime === 'function') {
+      setAccountFlagWithRuntime(['unlocks', 'trueform'], true, function(v) { unlockedTrueBoss = v; });
+    } else { unlockedTrueBoss = true; }
     const card = document.getElementById('modeTrueForm');
     if (card) card.style.display = '';
     ok('True Creator unlocked! Start a boss fight.');
   } else if (code === 'SOVEREIGN') {
-    localStorage.setItem('smc_sovereignBeaten', '1');
+    if (typeof setAccountFlagWithRuntime === 'function') {
+      setAccountFlagWithRuntime(['unlocks', 'sovereignBeaten'], true, function(v) { sovereignBeaten = v; });
+    } else { sovereignBeaten = true; }
     const adCard  = document.getElementById('modeAdaptive');
     const sovCard = document.getElementById('modeSovereign');
     if (adCard)  adCard.style.display  = '';
     if (sovCard) sovCard.style.display = '';
     ok('SOVEREIGN Ω unlocked! Select it from the menu.');
   } else if (code === 'CLASSMEGAKNIGHT') {
-    unlockedMegaknight = true;
-    localStorage.setItem('smc_megaknight','1');
+    if (typeof setAccountFlagWithRuntime === 'function') {
+      setAccountFlagWithRuntime(['unlocks', 'megaknight'], true, function(v) { unlockedMegaknight = v; });
+    } else { unlockedMegaknight = true; }
     ['p1Class','p2Class'].forEach(id => {
       const sel = document.getElementById(id);
       if (sel && !sel.querySelector('option[value="megaknight"]')) {

@@ -517,7 +517,7 @@ function _consoleExec(raw) {
     };
     const current = (typeof getCoinBalance === 'function')
       ? getCoinBalance()
-      : parseInt(localStorage.getItem('smb_coins') || '0', 10);
+      : (typeof playerCoins !== 'undefined' ? playerCoins : 0);
 
     if (action === 'show') {
       _consoleOk('Coins: ' + current + ' ⬡');
@@ -532,15 +532,15 @@ function _consoleExec(raw) {
 
     if (action === 'set') {
       if (typeof setCoinBalance === 'function') setCoinBalance(amount);
-      else localStorage.setItem('smb_coins', String(Math.max(0, amount)));
+      else if (typeof updateCoins === 'function') updateCoins(function() { return amount; });
       _consoleOk('Coins set to ' + Math.max(0, amount) + ' ⬡');
     } else if (action === 'give' || action === 'add' || action === 'grant') {
       if (typeof awardCoins === 'function') awardCoins(amount);
-      else localStorage.setItem('smb_coins', String(current + amount));
+      else if (typeof updateCoins === 'function') updateCoins(function(b) { return b + amount; });
       _consoleOk('Added ' + amount + ' ⬡. New balance: ' + (current + amount) + ' ⬡');
     } else if (action === 'take' || action === 'remove' || action === 'deduct') {
       if (typeof setCoinBalance === 'function') setCoinBalance(current - amount);
-      else localStorage.setItem('smb_coins', String(Math.max(0, current - amount)));
+      else if (typeof updateCoins === 'function') updateCoins(function(b) { return b - amount; });
       _consoleOk('Removed ' + amount + ' ⬡. New balance: ' + Math.max(0, current - amount) + ' ⬡');
     } else {
       _consoleErr('Usage: coins show|set <n>|give <n>|take <n>');
@@ -615,15 +615,17 @@ function _consoleExec(raw) {
   // ---- UNLOCK ----
   if (cmd.startsWith('UNLOCK')) {
     if (sub === 'trueform') {
-      if (typeof unlockedTrueBoss !== 'undefined') {
-        unlockedTrueBoss = true; localStorage.setItem('smc_trueform','1');
-        const card = document.getElementById('modeTrueForm');
-        if (card) card.style.display = '';
-        _consoleOk('True Form unlocked!');
-      }
+      if (typeof setAccountFlagWithRuntime === 'function') {
+        setAccountFlagWithRuntime(['unlocks', 'trueform'], true, function(v) { unlockedTrueBoss = v; });
+      } else if (typeof unlockedTrueBoss !== 'undefined') { unlockedTrueBoss = true; }
+      const card = document.getElementById('modeTrueForm');
+      if (card) card.style.display = '';
+      _consoleOk('True Form unlocked!');
     } else if (sub === 'megaknight') {
       if (typeof unlockedMegaknight !== 'undefined') {
-        unlockedMegaknight = true; localStorage.setItem('smc_megaknight','1');
+        if (typeof setAccountFlagWithRuntime === 'function') {
+          setAccountFlagWithRuntime(['unlocks', 'megaknight'], true, function(v) { unlockedMegaknight = v; });
+        } else { unlockedMegaknight = true; }
         ['p1Class','p2Class'].forEach(id => {
           const sel = document.getElementById(id);
           if (sel && !sel.querySelector('option[value="megaknight"]')) {

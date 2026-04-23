@@ -23,7 +23,7 @@
 //   DELETE /api/bans/:key      [admin]       — remove a ban by key
 //   DELETE /api/bans           [admin]       — bulk remove by identity (body)
 //
-// Data is persisted to ./data/bans.json.
+// Data is persisted via storage.js (SQLite by default, in-memory fallback).
 // ============================================================
 
 const { createServer } = require('http');
@@ -31,6 +31,7 @@ const { Server }       = require('socket.io');
 const fs               = require('fs');
 const path             = require('path');
 const mime             = require('mime-types');
+const storage          = require('./storage');
 
 const STATIC_ROOT = __dirname;
 
@@ -42,27 +43,16 @@ if (ADMIN_KEY === 'smb-dev-key-change-me') {
 }
 
 // ── Data persistence ─────────────────────────────────────────────────────────
-
-const DATA_DIR  = path.join(__dirname, 'data');
-const BANS_FILE = path.join(DATA_DIR, 'bans.json');
-
-function _ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-}
+// Reads/writes go through storage.js (SQLite, or in-memory fallback).
+// The old data/bans.json file is no longer used.
 
 function _loadBans() {
-  _ensureDataDir();
-  try {
-    return JSON.parse(fs.readFileSync(BANS_FILE, 'utf8'));
-  } catch (_) {
-    return { records: {}, lastModified: Date.now() };
-  }
+  return storage.get('bans') || { records: {}, lastModified: Date.now() };
 }
 
 function _saveBans(data) {
-  _ensureDataDir();
   data.lastModified = Date.now();
-  fs.writeFileSync(BANS_FILE, JSON.stringify(data, null, 2), 'utf8');
+  storage.set('bans', data);
 }
 
 // Removes expired records in-place. Returns true if any were removed.
@@ -356,6 +346,6 @@ httpServer.listen(PORT, () => {
   console.log(`\nStickman Battles relay + moderation API`);
   console.log(`  Listening on port ${PORT}`);
   console.log(`  Admin key: ${ADMIN_KEY === 'smb-dev-key-change-me' ? '(default — set ADMIN_KEY env var!)' : '(configured)'}`);
-  console.log(`  Bans file: ${BANS_FILE}`);
+  console.log(`  Storage:   ${storage.getType()}`);
   console.log(`  REST API:  http://localhost:${PORT}/api/status\n`);
 });
