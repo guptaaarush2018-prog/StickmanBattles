@@ -401,13 +401,11 @@ function _consoleExec(raw) {
         _consoleOk('Spawned Dummy');
       }
     } else if (sub === 'god') {
-      if (typeof God !== 'undefined') {
-        const _g = new God(450, 200);
-        _g._teamId = 2;
-        _g._consoleSummoned = true; // suppress Phase 1 crash
-        minions.push(_g);
-        _consoleOk('Summoned God (no crash — dev mode)');
-      } else _consoleErr('God class not available.');
+      if (typeof spawnGod === 'function') {
+        const _g = spawnGod(true); // consoleSummoned=true suppresses crash screen
+        if (_g) _consoleOk('Summoned God (no crash — dev mode)');
+        else    _consoleErr('God is already present.');
+      } else _consoleErr('spawnGod not available.');
     } else { _consoleErr('Unknown entity: ' + sub); }
     return;
   }
@@ -416,13 +414,11 @@ function _consoleExec(raw) {
   if (cmd.startsWith('SUMMON')) {
     if (typeof gameRunning === 'undefined' || !gameRunning) { _consoleErr('Start a game first.'); return; }
     if (sub === 'god') {
-      if (typeof God !== 'undefined') {
-        const _g = new God(450, 200);
-        _g._teamId = 2;
-        _g._consoleSummoned = true; // suppress Phase 1 crash
-        minions.push(_g);
-        _consoleOk('Summoned God (no crash — dev mode)');
-      } else _consoleErr('God class not available.');
+      if (typeof spawnGod === 'function') {
+        const _g = spawnGod(true); // consoleSummoned=true suppresses crash screen
+        if (_g) _consoleOk('Summoned God (no crash — dev mode)');
+        else    _consoleErr('God is already present.');
+      } else _consoleErr('spawnGod not available.');
     } else {
       _consoleErr('Usage: summon god');
     }

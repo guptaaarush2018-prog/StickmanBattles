@@ -462,12 +462,10 @@ function _startGameCore() {
     }
     players = [p1];
     p1.target = null;
-    // Spawn God into minions
-    if (typeof God !== 'undefined') {
-      const _god = new God(700, 200);
-      _god._teamId = 2;
-      minions.push(_god);
-      if (typeof _godWasAlive !== 'undefined') _godWasAlive = true;
+    // Spawn God into minions — spawnGod() enforces singleton and spawns near player
+    if (typeof spawnGod === 'function') {
+      const _god = spawnGod(false);
+      if (_god && typeof _godWasAlive !== 'undefined') _godWasAlive = true;
     }
     // Phase 2: spawn Paradox as ally
     if (typeof _isGodPhase2 === 'function' && _isGodPhase2() && typeof GodParadoxAlly !== 'undefined') {

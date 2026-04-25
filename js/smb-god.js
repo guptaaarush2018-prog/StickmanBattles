@@ -27,6 +27,7 @@ window.GODSLAYER_WEAPON = {
 };
 
 // ── Encounter state ────────────────────────────────────────────────────────
+const _GOD_ATTACK_RANGE   = 160;
 let _godEncounterCooldown = 0; // per-session cooldown in game-seconds (decrements in tick)
 let _godWasAlive          = false; // tracks whether God was alive this session fight
 
@@ -54,6 +55,20 @@ function updateGodEncounterTick() {
     _godEncounterCooldown = 600; // 10-minute in-game cooldown
     startGodEncounter();
   }
+}
+
+// ── Centralized God spawner — all callers must use this, never new God() directly ──
+function spawnGod(consoleSummoned) {
+  if (!Array.isArray(minions)) return null;
+  if (minions.some(m => m instanceof God)) return null; // singleton
+  const ref = Array.isArray(players) && players[0];
+  const gx  = ref ? ref.x + (Math.random() < 0.5 ? 1 : -1) * (120 + Math.random() * 80) : 450;
+  const gy  = ref ? ref.y - 100 : 200;
+  const g   = new God(gx, gy);
+  g._teamId          = 2;
+  g._consoleSummoned = !!consoleSummoned;
+  minions.push(g);
+  return g;
 }
 
 function startGodEncounter() {
@@ -175,8 +190,7 @@ class God extends Fighter {
     this.spawnX    = x;
     this.spawnY    = y;
     this.playerNum = 99;
-    this._attackCd    = 90;
-    this._prevP1Health = -1;
+    this._attackCd     = 90;
     this._crashFired   = false;
     this._consoleSummoned = false;
     this._wingAngle    = 0;
@@ -186,13 +200,13 @@ class God extends Fighter {
       this.health    = 1e15;
       this.maxHealth = 1e15;
       this.dmgMult   = 9999;
-      this.kbBonus   = 3.0;
+      this.kbBonus   = 1.5;  // applied once inside dealDamage — do not pre-multiply
       this.kbResist  = 0.9;
     } else {
       this.health    = 100000;
       this.maxHealth = 100000;
       this.dmgMult   = 3.0;
-      this.kbBonus   = 2.5;
+      this.kbBonus   = 1.2;  // applied once inside dealDamage — do not pre-multiply
       this.kbResist  = 0.7;
     }
   }
@@ -206,29 +220,14 @@ class God extends Fighter {
     if (typeof activeCinematic !== 'undefined' && activeCinematic) return;
 
     super.update();
-
+    // Clamp vertical velocity to prevent physics overflow from high-KB interactions
+    this.vy = Math.max(-19, Math.min(19, this.vy));
     this._wingAngle += 0.08;
 
-    // Phase 1 crash: detect first damage dealt to the human player
-    if (this._phase === 1 && !this._crashFired && !this._consoleSummoned) {
-      const humanP = Array.isArray(players)
-        ? players.find(p => p !== this && !p.isMinion && !p.isRemote && !p.isAI && !p.isBoss)
-        : null;
-      if (humanP) {
-        if (this._prevP1Health < 0) {
-          this._prevP1Health = humanP.health;
-        } else if (humanP.health < this._prevP1Health) {
-          this._crashFired = true;
-          _showGodFakeCrash();
-          return;
-        }
-        this._prevP1Health = humanP.health;
-      }
-    }
+    // Decrement cooldown every frame so movement is never blocked by it
+    if (this._attackCd > 0) this._attackCd--;
 
-    if (this._attackCd > 0) { this._attackCd--; return; }
-
-    // Target: nearest fighter who is not an ally
+    // Select ONE nearest valid target — no multi-target loops
     let target = null;
     let minDist = Infinity;
     if (Array.isArray(players)) {
@@ -242,22 +241,23 @@ class God extends Fighter {
     if (!target) return;
 
     this.target = target;
-    const dx   = target.cx() - this.cx();
-    const distX = Math.abs(dx);
-    const dir  = Math.sign(dx) || 1;
+    const dx  = target.cx() - this.cx();
+    const dir = Math.sign(dx) || 1;
     this.facing = dir;
 
     const speed = this._phase === 1 ? 7 : 5;
-    if (distX > 100) {
+    if (minDist > _GOD_ATTACK_RANGE) {
       this.vx = dir * speed;
-      if (this.onGround && distX > 220) this.vy = -16;
+      if (this.onGround && Math.abs(dx) > 220) this.vy = -16;
     } else {
       this.vx *= 0.7;
-      if (typeof dealDamage === 'function') {
-        const baseDmg = (this.weapon ? (this.weapon.damage || 20) : 20);
-        dealDamage(this, target, baseDmg * this.dmgMult, 8 * this.kbBonus);
+      // One dealDamage call per cooldown window — range is enforced inside dealDamage too
+      if (this._attackCd <= 0 && typeof dealDamage === 'function') {
+        const baseDmg = this.weapon ? (this.weapon.damage || 20) : 20;
+        // Pass raw base values; dmgMult and kbBonus are applied once by dealDamage
+        dealDamage(this, target, baseDmg, 8);
+        this._attackCd = this._phase === 1 ? 40 : 60;
       }
-      this._attackCd = this._phase === 1 ? 40 : 60;
     }
   }
 

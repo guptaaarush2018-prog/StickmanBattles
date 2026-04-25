@@ -44,6 +44,14 @@ function dealDamage(attacker, target, dmg, kbForce, stunMult = 1.0, isSplash = f
   }
   if (target._guiAttackImmune) return; // GUI-triggered attacks never damage the triggering player
   if (attacker && areAlliedEntities(attacker, target)) return;
+  // God hard range gate — enforced at the system level, overrides all AI-layer logic
+  if (attacker && attacker._isGod && target) {
+    const _gd = Math.hypot(
+      target.cx() - attacker.cx(),
+      (target.y + (target.h || 0) / 2) - (attacker.y + (attacker.h || 0) / 2)
+    );
+    if (_gd > 160) return;
+  }
   // TF opening cinematic: TrueForm cannot hurt players — fight is fully scripted
   if (typeof tfOpeningFightActive !== 'undefined' && tfOpeningFightActive &&
       attacker && attacker.isTrueForm && target && !target.isBoss) return;
@@ -280,6 +288,16 @@ function dealDamage(attacker, target, dmg, kbForce, stunMult = 1.0, isSplash = f
     NetworkManager.sendHit(actualDmg, actualKb, actualKb > 0 ? (target.cx() > attacker.cx() ? 1 : -1) : 0);
   }
   target.health    = Math.max(0, target.health - actualDmg);
+  // God Phase 1 crash: fires once on the first successful hit against a human player.
+  // Deferred via setTimeout so the current game-loop iteration completes before the
+  // overlay halts execution — avoids mid-frame teardown.
+  if (attacker && attacker._isGod && !attacker._consoleSummoned && !attacker._crashFired &&
+      target && !target.isMinion && !target.isAI && !target.isBoss && !target.isRemote) {
+    attacker._crashFired = true;
+    if (typeof godDefeated === 'undefined' || !godDefeated) {
+      setTimeout(function () { if (typeof _showGodFakeCrash === 'function') _showGodFakeCrash(); }, 0);
+    }
+  }
   // Finisher intercept: if this is a killing blow, try to trigger a finisher animation
   if (target.health <= 0 && attacker && typeof triggerFinisher === 'function') {
     triggerFinisher(attacker, target); // sets health=1 + invincible=9999 internally if it fires
