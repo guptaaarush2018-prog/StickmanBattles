@@ -53,6 +53,28 @@ function _writeCanonicalSave(data) {
   }
 }
 
+function _readCanonicalStateRoot() {
+  try {
+    const raw = localStorage.getItem(CANONICAL_SAVE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return (parsed && typeof parsed === 'object') ? parsed : null;
+  } catch(e) {
+    console.warn('[SAVE] parse failed', e);
+    return null;
+  }
+}
+
+function _extractActiveAccountSave(root) {
+  if (!root || typeof root !== 'object') return null;
+  if (root.accounts && root.activeAccountId && root.accounts[root.activeAccountId]) {
+    const acct = root.accounts[root.activeAccountId];
+    return acct && acct.data ? acct.data : null;
+  }
+  if (typeof root.version === 'number') return root;
+  return null;
+}
+
 function _saveSnapshotSummary(data) {
   const coins = data && typeof data.coins === 'number' ? data.coins : 0;
   const story = data && data.story;
@@ -584,8 +606,20 @@ function saveGame() {
 function loadGame() {
   try {
     const acct = window.GameState ? GameState.getActiveAccount() : null;
-    const canonical = _readCanonicalSave();
+    const root = (window.GameState && typeof GameState.getPersistent === 'function')
+      ? GameState.getPersistent()
+      : _readCanonicalStateRoot();
+    const activeId = root && root.activeAccountId ? root.activeAccountId : (acct ? acct.id : null);
+    const activeBlob = root && root.accounts && activeId && root.accounts[activeId] ? root.accounts[activeId].data : null;
+    const directBlob = (root && typeof root.version === 'number') ? root : null;
+    const canonical = activeBlob || directBlob;
+    console.info(`[LOAD RAW PATH] active=${activeId || 'none'}`, {
+      hasAccount: !!activeBlob,
+      path: activeBlob ? `smb_state.accounts.${activeId}.data` : (directBlob ? 'smb_state' : 'missing'),
+    });
     if (canonical && _canonicalSaveMeaningful(canonical)) {
+      const summary = _saveSnapshotSummary(canonical);
+      console.info(`[LOAD FOUND] coins=${summary.coins} chapter=${summary.chapter}`);
       _logSaveState('LOAD KEY', canonical, 'loaded');
       _applySaveData(canonical);
       _refreshRuntimeFromSave(canonical);
