@@ -302,7 +302,74 @@ function _gatherProgressionData() {
   return data;
 }
 
-// ── Gather current state from individual localStorage keys ────────────────────
+// ── Flush volatile runtime state into account.data (SSOT approach) ───────────
+// Called by saveGame() before serializing.  account.data is the single source
+// of truth; this function writes runtime globals that are NOT automatically
+// committed via setAccountFlag (story, storyProgress, settings, progression).
+// For fields that ARE committed via setAccountFlag (coins, cosmetics, unlock
+// flags), we write from runtime as a safety net using the "never lower" rule.
+function _flushRuntimeIntoBase(base) {
+  // story — _story2 lives in smb-story-config.js; flush its snapshot
+  if (typeof getStoryDataForSave === 'function') {
+    const _snap = getStoryDataForSave();
+    if (_snap && Array.isArray(_snap.defeated)) base.story = _snap;
+  }
+  // storyProgress — STORY_PROGRESS is mutated directly in smb-progression.js
+  if (typeof STORY_PROGRESS !== 'undefined') {
+    if (!base.storyProgress || typeof base.storyProgress !== 'object') base.storyProgress = {};
+    if (typeof STORY_PROGRESS.act     === 'number') base.storyProgress.act     = STORY_PROGRESS.act;
+    if (typeof STORY_PROGRESS.chapter === 'number') base.storyProgress.chapter = STORY_PROGRESS.chapter;
+    if (STORY_PROGRESS.flags && typeof STORY_PROGRESS.flags === 'object') {
+      base.storyProgress.flags = Object.assign({}, STORY_PROGRESS.flags);
+    }
+    if (!Array.isArray(base.storyProgress.defeated)) base.storyProgress.defeated = [];
+  }
+  // chapter top-level — take the highest observed value
+  const _rch = (base.story && typeof base.story.chapter === 'number') ? base.story.chapter
+    : (base.storyProgress && typeof base.storyProgress.chapter === 'number') ? base.storyProgress.chapter : 0;
+  if (typeof base.chapter !== 'number' || _rch > base.chapter) base.chapter = _rch;
+  // coins — runtime is always authoritative (kept in sync by updateCoins → setAccountFlagWithRuntime)
+  if (typeof playerCoins === 'number') base.coins = playerCoins;
+  // cosmetics — runtime is always authoritative (kept in sync by addCosmetic → setAccountFlag)
+  if (typeof unlockedCosmetics !== 'undefined' && Array.isArray(unlockedCosmetics)) {
+    base.cosmetics = unlockedCosmetics.slice();
+  }
+  // achievements
+  if (typeof earnedAchievements !== 'undefined') {
+    const _ach = Array.from(earnedAchievements);
+    base.achievements = _ach;
+    if (!base.unlocks) base.unlocks = {};
+    base.unlocks.achievements = _ach;
+  }
+  // unlock flags — safety net; never lower a flag that's already true in account.data
+  if (!base.unlocks) base.unlocks = {};
+  if (typeof bossBeaten         !== 'undefined') base.unlocks.bossBeaten      = base.unlocks.bossBeaten      || !!bossBeaten;
+  if (typeof unlockedTrueBoss   !== 'undefined') base.unlocks.trueform        = base.unlocks.trueform        || !!unlockedTrueBoss;
+  if (typeof unlockedMegaknight !== 'undefined') base.unlocks.megaknight      = base.unlocks.megaknight      || !!unlockedMegaknight;
+  if (typeof sovereignBeaten    !== 'undefined') base.unlocks.sovereignBeaten = base.unlocks.sovereignBeaten || !!sovereignBeaten;
+  if (typeof storyOnline        !== 'undefined') base.unlocks.storyOnline     = base.unlocks.storyOnline     || !!storyOnline;
+  if (typeof storyDodgeUnlocked !== 'undefined') base.unlocks.storyDodgeUnlocked = base.unlocks.storyDodgeUnlocked || !!storyDodgeUnlocked;
+  if (typeof paradoxCompanionActive !== 'undefined') base.unlocks.paradoxCompanion = base.unlocks.paradoxCompanion || !!paradoxCompanionActive;
+  if (typeof godEncountered     !== 'undefined') base.unlocks.godEncountered  = base.unlocks.godEncountered  || !!godEncountered;
+  if (typeof godDefeated        !== 'undefined') base.unlocks.godDefeated     = base.unlocks.godDefeated     || !!godDefeated;
+  if (typeof collectedLetterIds !== 'undefined') {
+    const _ids = Array.from(collectedLetterIds);
+    if (!Array.isArray(base.unlocks.letters) || _ids.length > base.unlocks.letters.length) base.unlocks.letters = _ids;
+  }
+  // settings
+  base.settings = {
+    sfxVol:    parseFloat(localStorage.getItem('smc_sfxVol') || '0.35'),
+    sfxMute:   (localStorage.getItem('smc_sfxMute')   === '1'),
+    musicMute: (localStorage.getItem('smc_musicMute') === '1'),
+    ragdoll:   (typeof settings !== 'undefined') ? !!settings.ragdollEnabled : (localStorage.getItem('smc_ragdoll') === '1'),
+  };
+  // progression
+  base.progression = _gatherProgressionData();
+  // version stamp
+  base.version = SAVE_VERSION;
+}
+
+// ── Gather current state from individual localStorage keys (used by export) ──
 function _gatherSaveData() {
   const active = (typeof GameState !== 'undefined' && typeof GameState.getActiveAccount === 'function')
     ? GameState.getActiveAccount()
@@ -541,6 +608,7 @@ function updateCoins(fn, _retry) {
   if (!_retry && typeof playerCoins !== 'undefined' && base !== playerCoins) {
     return updateCoins(fn, true);
   }
+  if (clamped !== base) console.info('[STATE MUTATION] coins', base, '->', clamped);
   setAccountFlagWithRuntime(['coins'], clamped, function(v) {
     if (typeof playerCoins !== 'undefined') playerCoins = v;
   });
@@ -551,6 +619,7 @@ function addCosmetic(id) {
   if (typeof unlockedCosmetics === 'undefined') return;
   if (unlockedCosmetics.indexOf(id) !== -1) return;
   unlockedCosmetics.push(id);
+  console.info('[STATE MUTATION] cosmetics added', id);
   setAccountFlag(['cosmetics'], unlockedCosmetics.slice());
 }
 
@@ -617,8 +686,13 @@ function saveGame() {
     if (!window.GameState) return;
     const acct = GameState.getActiveAccount();
     if (!acct) return;
-    const data = _gatherSaveData();
-    const normalized = _normalizeAccountSaveShape(data) || data;
+    // account.data is the single source of truth.
+    // Start from existing account.data (already contains all setAccountFlag mutations)
+    // then flush volatile runtime state (story, storyProgress, settings, progression)
+    // that does not go through setAccountFlag on every change.
+    const base = (acct.data && typeof acct.data === 'object') ? acct.data : {};
+    _flushRuntimeIntoBase(base);
+    const normalized = _normalizeAccountSaveShape(base) || base;
     const summary = _saveSnapshotSummary(normalized);
     if (!_canonicalSaveMeaningful(normalized)) {
       console.info('[DEFAULT BLOCKED]', summary);
@@ -626,14 +700,12 @@ function saveGame() {
     }
     const preserveTs = (window.__SMB_PENDING_SAVE_TIMESTAMP !== undefined);
     normalized.meta = {
-      updatedAt: preserveTs
-        ? Number(window.__SMB_PENDING_SAVE_TIMESTAMP) || 0
-        : Date.now(),
+      updatedAt: preserveTs ? Number(window.__SMB_PENDING_SAVE_TIMESTAMP) || 0 : Date.now(),
       source: 'local',
     };
     normalized.updatedAt = normalized.meta.updatedAt;
-    // Preserve the _legacyCleared flag so cleanup is not undone on next load
     if (acct.data && acct.data._legacyCleared) normalized._legacyCleared = true;
+    console.info('[SAVE SNAPSHOT]', { coins: summary.coins, chapter: summary.chapter, version: normalized.version });
     GameState.update(function(s) {
       const a = s.persistent.accounts[s.persistent.activeAccountId];
       if (a) a.data = normalized;

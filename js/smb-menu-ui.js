@@ -240,6 +240,8 @@ function _syncCoinDisplay() {
 }
 
 function getCoinBalance() {
+  // Sync from runtime global in case loadGame() ran after this module initialized
+  if (typeof playerCoins === 'number' && playerCoins !== coinBalance) coinBalance = playerCoins;
   return coinBalance;
 }
 
@@ -259,7 +261,7 @@ function setCoinBalance(value) {
 }
 
 function awardCoins(n) {
-  return setCoinBalance(coinBalance + (Number(n) || 0));
+  return setCoinBalance(getCoinBalance() + (Number(n) || 0));
 }
 
 // ---- Unlocked cosmetics (sourced from unlockedCosmetics global) ----
@@ -275,8 +277,8 @@ function unlockCosmetic(id) {
   const entry = COSMETIC_CATALOG.find(c => c.id === id);
   if (!entry) return false;
   if (isCosmeticUnlocked(id)) return true;
-  if (coinBalance < entry.price) return false;
-  setCoinBalance(coinBalance - entry.price);
+  if (getCoinBalance() < entry.price) return false;
+  setCoinBalance(getCoinBalance() - entry.price);
   if (typeof addCosmetic === 'function') {
     addCosmetic(id);
   } else if (typeof unlockedCosmetics !== 'undefined' && unlockedCosmetics.indexOf(id) === -1) {

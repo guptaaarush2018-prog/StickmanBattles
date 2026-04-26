@@ -222,8 +222,26 @@ function story2OnMatchEnd(playerWon) {
   if (_firstClear) {
     _story2.defeated.push(ch.id);
     if (typeof playerPowerLevel !== 'undefined') playerPowerLevel = Math.min(3.0, playerPowerLevel + 0.02);
+    // Immediately commit defeated list to account.data so it survives before saveGame flushes
+    const _acctD = window.GameState ? GameState.getActiveAccount() : null;
+    if (_acctD && _acctD.data) {
+      if (!_acctD.data.story || typeof _acctD.data.story !== 'object') _acctD.data.story = {};
+      if (!Array.isArray(_acctD.data.story.defeated)) _acctD.data.story.defeated = [];
+      if (!_acctD.data.story.defeated.includes(ch.id)) _acctD.data.story.defeated.push(ch.id);
+    }
   }
+  const _prevChapter = _story2.chapter;
   _story2.chapter = Math.max(_story2.chapter, ch.id + 1);
+  if (_story2.chapter !== _prevChapter) {
+    console.info('[STATE MUTATION] chapter', _prevChapter, '->', _story2.chapter);
+    // Immediately commit chapter to account.data — authoritative before saveGame flushes
+    const _acctC = window.GameState ? GameState.getActiveAccount() : null;
+    if (_acctC && _acctC.data) {
+      if (!_acctC.data.story || typeof _acctC.data.story !== 'object') _acctC.data.story = {};
+      _acctC.data.story.chapter = _story2.chapter;
+      _acctC.data.chapter = _story2.chapter;
+    }
+  }
   if (typeof completeObjective === 'function') completeObjective();
   // Online: broadcast story state so clients stay in sync
   if (typeof onlineMode !== 'undefined' && onlineMode && typeof NetworkManager !== 'undefined' && NetworkManager.connected) {
