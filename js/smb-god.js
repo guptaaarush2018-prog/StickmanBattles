@@ -48,6 +48,10 @@ function _isGodPhase2() {
 function updateGodEncounterTick() {
   if (typeof gameRunning === 'undefined' || !gameRunning) return;
   if (typeof gameMode !== 'undefined' && gameMode === 'god') return;
+  // Block during boss fights
+  if (typeof gameMode !== 'undefined' && (gameMode === 'boss' || gameMode === 'trueform')) return;
+  // Block in multiplayer
+  if (typeof onlineMode !== 'undefined' && onlineMode) return;
   if (_godEncounterCooldown > 0) { _godEncounterCooldown--; return; }
   if (typeof activeCinematic !== 'undefined' && activeCinematic) return;
   if (typeof storyModeActive !== 'undefined' && storyModeActive) return;
@@ -80,8 +84,84 @@ function startGodEncounter() {
       godEncountered = true;
     }
   }
+  // After first defeat, give the player a choice rather than auto-teleporting
+  if (typeof godDefeated !== 'undefined' && godDefeated) {
+    _showGodChallengePrompt();
+    return;
+  }
   if (typeof gameMode !== 'undefined') gameMode = 'god';
   if (typeof startGame === 'function') startGame();
+}
+
+function _showGodChallengePrompt() {
+  if (document.getElementById('_godChallengeOverlay')) return;
+
+  const style = document.createElement('style');
+  style.id = '_godChallengeStyles';
+  style.textContent = `
+    #_godChallengeOverlay {
+      position:fixed;inset:0;z-index:99998;
+      background:rgba(0,0,8,0.72);
+      display:flex;align-items:center;justify-content:center;
+      animation:_gcFadeIn 0.3s ease;
+    }
+  `;
+  document.head.appendChild(style);
+
+  const div = document.createElement('div');
+  div.id = '_godChallengeOverlay';
+  div.innerHTML = `
+    <div style="
+      background:linear-gradient(160deg,#06001a,#0e0024);
+      border:1.5px solid rgba(200,200,255,0.35);
+      border-radius:18px;padding:32px 40px 26px;
+      width:min(460px,90vw);
+      box-shadow:0 8px 60px rgba(160,130,255,0.3),0 0 120px rgba(80,60,180,0.15);
+      text-align:center;color:#ddd;">
+      <div style="font-size:2.4rem;margin-bottom:10px;">✦</div>
+      <div style="font-size:1.1rem;font-weight:800;color:#e8e0ff;letter-spacing:0.5px;margin-bottom:8px;">
+        God has issued a challenge
+      </div>
+      <div style="font-size:0.82rem;color:#aaa;margin-bottom:22px;line-height:1.6;">
+        A divine presence has chosen you once again.<br>
+        Will you abandon this fight to answer the call?
+      </div>
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+        <button id="_godChallengeAccept"
+          style="background:rgba(200,180,255,0.18);border:1.5px solid rgba(200,180,255,0.55);
+          color:#e0d8ff;border-radius:9px;padding:10px 28px;cursor:pointer;
+          font-family:inherit;font-size:0.88rem;font-weight:700;
+          transition:background 0.15s;">
+          Accept
+        </button>
+        <button id="_godChallengeDecline"
+          style="background:rgba(255,255,255,0.06);border:1.5px solid rgba(255,255,255,0.2);
+          color:#999;border-radius:9px;padding:10px 28px;cursor:pointer;
+          font-family:inherit;font-size:0.88rem;font-weight:700;
+          transition:background 0.15s;">
+          Decline
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(div);
+
+  function _closePrompt() {
+    div.remove();
+    const st = document.getElementById('_godChallengeStyles');
+    if (st) st.remove();
+  }
+
+  document.getElementById('_godChallengeAccept').addEventListener('click', function () {
+    _closePrompt();
+    if (typeof gameMode !== 'undefined') gameMode = 'god';
+    if (typeof startGame === 'function') startGame();
+  });
+
+  document.getElementById('_godChallengeDecline').addEventListener('click', function () {
+    _closePrompt();
+    // Player declined — keep cooldown so they aren't spammed again immediately
+    _godEncounterCooldown = 300; // 5-minute cooldown after a decline
+  });
 }
 
 // Called from smb-loop-core.js after minions are filtered (death hook)
