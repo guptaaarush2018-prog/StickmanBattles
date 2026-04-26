@@ -501,23 +501,23 @@ const SupabaseBridge = (() => {
     return ids;
   }
 
-  async function _upsertRows(client, table, rows, key) {
+  async function _upsertRows(client, table, rows, conflictCol) {
     if (!rows || rows.length === 0) {
       const del = await client.from(table).delete().eq('user_id', _user.id);
       if (del.error) throw del.error;
       return;
     }
-    const del = await client.from(table).delete().eq('user_id', _user.id);
-    if (del.error) throw del.error;
     const payload = rows.map(function(row) {
       return Object.assign({ user_id: _user.id }, row);
     });
-    const res = await client.from(table).insert(payload);
+    const opts = conflictCol ? { onConflict: 'user_id,' + conflictCol } : {};
+    const res = await client.from(table).upsert(payload, opts);
     if (res.error) throw res.error;
   }
 
   async function syncFromRuntime(saveOverride) {
     if (!isAvailable()) return { skipped: true, reason: 'unavailable' };
+    if (_syncInFlight) return { skipped: true, reason: 'in_flight' };
     await ensureReady();
     if (!_session || !_user) return { skipped: true, reason: 'signed_out' };
     const save = saveOverride || _runtimeSave();
@@ -552,9 +552,9 @@ const SupabaseBridge = (() => {
       if (statsRes.error) throw statsRes.error;
       const snapshotRes = await client.from('player_save_snapshots').upsert(_buildSnapshotRow(saveCopy));
       if (snapshotRes.error) throw snapshotRes.error;
-      await _upsertRows(client, 'player_unlocked_weapons', weaponRows);
-      await _upsertRows(client, 'player_chapters_beaten', chapterRows);
-      await _upsertRows(client, 'player_cosmetics', cosmeticRows);
+      await _upsertRows(client, 'player_unlocked_weapons', weaponRows, 'weapon_key');
+      await _upsertRows(client, 'player_chapters_beaten', chapterRows, 'chapter_index');
+      await _upsertRows(client, 'player_cosmetics', cosmeticRows, 'cosmetic_id');
       if (typeof window.GameState !== 'undefined' && typeof GameState.update === 'function' && typeof GameState.save === 'function') {
         GameState.update(function(s) {
           const acct = s.persistent.accounts && s.persistent.activeAccountId
