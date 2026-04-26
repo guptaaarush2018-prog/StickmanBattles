@@ -252,8 +252,17 @@ function _applyBossFightLivesLockToPlayers() {
 }
 
 function toggleSettings() {
-  const panel = document.getElementById('settingsPanel');
-  panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+  openSettingsModal();
+}
+
+function openSettingsModal() {
+  const m = document.getElementById('settingsModal');
+  if (m) m.style.display = 'flex';
+}
+
+function closeSettingsModal() {
+  const m = document.getElementById('settingsModal');
+  if (m) m.style.display = 'none';
 }
 
 function toggleCard(id) {

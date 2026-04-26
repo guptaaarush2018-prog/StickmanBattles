@@ -1703,4 +1703,233 @@ input[type="color"] {
 .sa-desc2 { font-size: 0.67rem; color: #889; line-height: 1.4; margin-bottom: 5px; }
 .sa-cost2 { font-size: 0.68rem; color: #ffd700; }
 .sa-cost2.sa-owned-label { color: #66ee99; }
+
+/* ============================================================
+   HOME QUICK NAV BAR
+   ============================================================ */
+.home-quicknav {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 4px 0 2px;
+}
+
+.home-nav-btn {
+  font-family: inherit;
+  font-size: 0.70rem;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  color: rgba(200, 215, 255, 0.80);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 20px;
+  padding: 5px 14px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.12s;
+  white-space: nowrap;
+}
+.home-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #fff;
+  transform: translateY(-1px);
+}
+.home-nav-btn:active { transform: scale(0.96); }
+
+/* ============================================================
+   SHARED MODAL BOX
+   ============================================================ */
+.smb-modal-box {
+  background: #0b0b1e;
+  border: 1px solid rgba(140, 120, 255, 0.28);
+  border-radius: 14px;
+  padding: 24px 28px;
+  color: #dde4ff;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  box-shadow: 0 0 60px rgba(80, 60, 200, 0.18), 0 4px 32px rgba(0,0,0,0.85);
+  background-image: var(--panel-noise);
+  background-blend-mode: overlay;
+  animation: fadeIn 0.18s ease;
+}
+
+.smb-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.smb-modal-header span {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #c8d8ff;
+}
+
+.smb-modal-close {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  color: #9aa0c0;
+  padding: 4px 14px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s;
+}
+.smb-modal-close:hover { background: rgba(255,255,255,0.12); color: #fff; }
+
+/* ============================================================
+   SETTINGS MODAL SECTIONS
+   ============================================================ */
+.settings-modal-section {
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.settings-modal-label {
+  font-size: 0.60rem;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: rgba(160, 185, 255, 0.55);
+  margin-bottom: 10px;
+}
+
+/* ============================================================
+   COMMUNITY MODAL CARDS
+   ============================================================ */
+.community-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.03);
+  transition: background 0.15s;
+}
+.community-card:hover { background: rgba(255,255,255,0.06); }
+
+.community-card-icon {
+  font-size: 1.6rem;
+  flex-shrink: 0;
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.community-card-body { flex: 1; min-width: 0; }
+
+.community-card-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #dde4ff;
+  margin-bottom: 3px;
+}
+
+.community-card-desc {
+  font-size: 0.70rem;
+  color: var(--muted);
+  line-height: 1.45;
+  margin-bottom: 10px;
+}
+
+.community-btn {
+  display: inline-block;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 6px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.08);
+  color: #dde4ff;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s, transform 0.12s;
+}
+.community-btn:hover { background: rgba(255,255,255,0.14); transform: translateY(-1px); }
+
+.discord-btn {
+  background: rgba(88, 101, 242, 0.22);
+  border-color: rgba(88, 101, 242, 0.5);
+  color: #b0baff;
+}
+.discord-btn:hover { background: rgba(88, 101, 242, 0.36); }
+
+/* ============================================================
+   POST-CHAPTER-1 SAVE PROGRESS MODAL
+   ============================================================ */
+.save-progress-box {
+  text-align: center;
+  max-width: 400px;
+  width: 92vw;
+  padding: 36px 32px 28px;
+  border-color: rgba(100, 200, 255, 0.25);
+  box-shadow: 0 0 80px rgba(0, 180, 255, 0.20), 0 4px 32px rgba(0,0,0,0.9);
+}
+
+.save-progress-title {
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.save-progress-sub {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, #00d4ff, #7c3aed);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 14px;
+}
+
+.save-progress-body {
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.6;
+  max-width: 300px;
+  margin: 0 auto;
+}
+
+/* ============================================================
+   MENU FOOTER ROW
+   ============================================================ */
+.menu-footer-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-bottom: 4px;
+}
+
+.footer-pill {
+  font-family: inherit;
+  font-size: 0.67rem;
+  font-weight: 600;
+  color: rgba(180, 200, 255, 0.65);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 14px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.footer-pill:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: rgba(220, 230, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.22);
+}
 .sa-cost2.sa-locked-label { color: #558; }
