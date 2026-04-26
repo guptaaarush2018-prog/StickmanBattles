@@ -392,6 +392,16 @@ let _acctModalData = { view: 'list', targetId: null, recoveryCode: null };
 function openAccountsModal() {
   _acctModalData = { view: 'list', targetId: null, recoveryCode: null };
   _acctEnsureModal();
+  if (window.SupabaseBridge && typeof SupabaseBridge.bootstrap === 'function') {
+    SupabaseBridge.bootstrap().catch(function(e) { console.warn('[accounts] cloud bootstrap failed:', e); });
+  }
+  if (window.SupabaseBridge && !window.__acctCloudListenerInstalled && typeof SupabaseBridge.onChange === 'function') {
+    window.__acctCloudListenerInstalled = true;
+    SupabaseBridge.onChange(function() {
+      const modal = document.getElementById('accountsModal');
+      if (modal && modal.style.display === 'flex') _acctRender();
+    });
+  }
   _acctRender();
   document.getElementById('accountsModal').style.display = 'flex';
 }
@@ -442,6 +452,7 @@ function _acctRenderList(inner) {
   const active            = AccountManager.getActiveAccount();
   const activeHasPassword = active && AccountManager.hasPassword(active.id);
   const activeIsLocked    = active && AccountManager.isLocked(active.id);
+  const cloudSection      = _acctRenderCloudSection();
 
   let rows = '';
   accounts.forEach(function(acct) {
@@ -484,11 +495,48 @@ function _acctRenderList(inner) {
     : '';
 
   inner.innerHTML = '<h3 style="margin:0 0 16px;font-size:1.1rem;color:#88ccff;">👤 Accounts</h3>'
+    + cloudSection
     + '<div style="max-height:300px;overflow-y:auto;margin-bottom:14px;">' + rows + '</div>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
     + '<button onclick="_acctCreatePrompt()" style="' + _acctBtnStyle('blue') + ';flex:1;">+ New Account</button>'
     + logoutBtn
     + '<button onclick="closeAccountsModal()" style="' + _acctBtnStyle('dim') + '">Close</button>'
+    + '</div>';
+}
+
+function _acctRenderCloudSection() {
+  if (!window.SupabaseBridge) {
+    return '<div style="margin:0 0 14px;padding:12px;border:1px solid rgba(100,180,255,0.18);border-radius:8px;background:rgba(255,255,255,0.03);font-size:0.78rem;opacity:0.65;">Cloud saves are not loaded.</div>';
+  }
+  const st = typeof SupabaseBridge.getState === 'function' ? SupabaseBridge.getState() : { ready: false, available: false };
+  const session = st.session;
+  const user = st.user;
+  const signedIn = !!(session && user);
+  const title = signedIn ? '☁️ Cloud Save Connected' : (st.available ? '☁️ Connect Cloud Save' : '☁️ Cloud Save Unavailable');
+  const status = signedIn
+    ? ('Signed in as <strong style="color:#dde4ff;">' + _acctEscHtml(user.email || user.id) + '</strong>')
+    : (st.available ? 'Sign in to sync progress across browsers and devices.' : 'Add Supabase config to enable cloud sync.');
+  const buttonRow = signedIn
+    ? '<button onclick="_acctCloudSyncNow()" style="' + _acctBtnStyle('green') + '">Sync Now</button>'
+      + '<button onclick="_acctCloudLogOut()" style="' + _acctBtnStyle('orange') + '">Sign Out</button>'
+    : '<button onclick="_acctCloudSignIn()" style="' + _acctBtnStyle('blue') + '">Log In</button>'
+      + '<button onclick="_acctCloudSignUp()" style="' + _acctBtnStyle('purple') + '">Sign Up</button>';
+
+  return '<div style="margin:0 0 14px;padding:12px;border:1px solid rgba(100,180,255,0.18);border-radius:8px;background:rgba(255,255,255,0.03);">'
+    + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap;">'
+    + '<div>'
+    + '<div style="font-size:0.82rem;font-weight:700;color:#88ccff;margin-bottom:4px;">' + title + '</div>'
+    + '<div style="font-size:0.76rem;opacity:0.7;line-height:1.4;">' + status + '</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + buttonRow + '</div>'
+    + '</div>'
+    + (signedIn ? ''
+      : '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;">'
+        + '<input id="_acctCloudEmail" type="email" placeholder="Email" autocomplete="email" style="' + _acctInputStyle() + '">'
+        + '<input id="_acctCloudPassword" type="password" placeholder="Password" autocomplete="current-password" style="' + _acctInputStyle() + '">'
+        + '</div>'
+        + '<div id="_acctCloudMsg" style="min-height:18px;margin-top:6px;font-size:0.76rem;opacity:0.72;"></div>')
+    + '<div style="margin-top:6px;font-size:0.72rem;opacity:0.5;line-height:1.4;">Cloud auth uses Supabase sessions. A successful login keeps progress synced on GitHub Pages, itch.io, and Render.</div>'
     + '</div>';
 }
 
@@ -639,6 +687,71 @@ function _acctSubmitRecovery() {
   if (!newCode) { if (err) err.textContent = 'Invalid recovery code. Check it and try again.'; return; }
   _acctModalData.recoveryCode = newCode;
   _acctNav('showcode');
+}
+
+async function _acctCloudSignIn() {
+  if (!window.SupabaseBridge || typeof SupabaseBridge.signInAndLoad !== 'function') return;
+  const email = ((document.getElementById('_acctCloudEmail') || {}).value || '').trim();
+  const password = ((document.getElementById('_acctCloudPassword') || {}).value || '');
+  const msg = document.getElementById('_acctCloudMsg');
+  if (!email || !password) {
+    if (msg) msg.textContent = 'Enter email and password.';
+    return;
+  }
+  if (msg) msg.textContent = 'Signing in...';
+  const res = await SupabaseBridge.signInAndLoad(email, password);
+  if (res && res.error) {
+    if (msg) msg.textContent = res.error.message || 'Login failed.';
+    return;
+  }
+  if (msg) msg.textContent = '';
+  _acctRender();
+  _acctToast('Cloud session restored.');
+}
+
+async function _acctCloudSignUp() {
+  if (!window.SupabaseBridge || typeof SupabaseBridge.signUpAndLoad !== 'function') return;
+  const email = ((document.getElementById('_acctCloudEmail') || {}).value || '').trim();
+  const password = ((document.getElementById('_acctCloudPassword') || {}).value || '');
+  const msg = document.getElementById('_acctCloudMsg');
+  if (!email || !password) {
+    if (msg) msg.textContent = 'Enter email and password.';
+    return;
+  }
+  if (password.length < 6) {
+    if (msg) msg.textContent = 'Password should be at least 6 characters.';
+    return;
+  }
+  if (msg) msg.textContent = 'Creating account...';
+  const res = await SupabaseBridge.signUpAndLoad(email, password);
+  if (res && res.error) {
+    if (msg) msg.textContent = res.error.message || 'Signup failed.';
+    return;
+  }
+  if (msg) {
+    msg.textContent = (res && res.data && res.data.session)
+      ? 'Cloud account created and signed in.'
+      : 'Account created. Check your email to confirm, then return to sign in.';
+  }
+  _acctRender();
+}
+
+async function _acctCloudLogOut() {
+  if (!window.SupabaseBridge || typeof SupabaseBridge.signOut !== 'function') return;
+  await SupabaseBridge.signOut().catch(function(e) { console.warn('[accounts] cloud signout failed:', e); });
+  _acctRender();
+  _acctToast('Cloud session signed out.');
+}
+
+async function _acctCloudSyncNow() {
+  if (!window.SupabaseBridge || typeof SupabaseBridge.reconcileActiveSave !== 'function') return;
+  const msg = document.getElementById('_acctCloudMsg');
+  if (msg) msg.textContent = 'Syncing...';
+  await SupabaseBridge.reconcileActiveSave().catch(function(e) {
+    if (msg) msg.textContent = e && e.message ? e.message : 'Cloud sync failed.';
+  });
+  if (msg) msg.textContent = 'Cloud save synchronized.';
+  _acctToast('Cloud save synced.');
 }
 
 // ── View: Show Recovery Code ──────────────────────────────────────────────────

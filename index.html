@@ -504,6 +504,7 @@
         <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
           <button class="btn settings-toggle" onclick="toggleStatsLog()">Stats Log</button>
           <button class="btn settings-toggle" onclick="showAchievementsModal()" style="color:#ffcc00;border-color:rgba(255,200,0,0.4);">🏆 Achievements</button>
+          <button id="cloudAuthBtn" class="btn settings-toggle" onclick="openAccountsModal()" style="color:#88ddff;border-color:rgba(80,180,255,0.4);" title="Sign in or create a cloud save account">☁️ Cloud</button>
           <button class="btn settings-toggle" onclick="openAccountsModal()" style="color:#aaddff;border-color:rgba(100,180,255,0.4);">👤 Accounts</button>
           <button class="btn settings-toggle" onclick="document.getElementById('resetConfirmRow').style.display='block'" style="color:#ff8888;border-color:rgba(255,80,80,0.4);">Reset Progress</button>
         </div>
@@ -1182,6 +1183,8 @@
   <!-- Centralized runtime state (accounts, admin overrides, online session) -->
   <!-- Must load before smb-online.js, smb-accounts.js, and smb-admin.js -->
   <script src="./js/smb-state.js"></script>
+  <!-- Supabase auth + cloud save bridge -->
+  <script src="./js/smb-supabase.js"></script>
   <!-- Lobby presence layer — wraps NetworkManager with lobby API + UI -->
   <script src="./js/smb-online.js"></script>
   <!-- Developer debug toolkit (loaded last so all systems exist) -->

@@ -142,6 +142,9 @@ function _gatherProgressionData() {
 
 // ── Gather current state from individual localStorage keys ────────────────────
 function _gatherSaveData() {
+  const active = (typeof GameState !== 'undefined' && typeof GameState.getActiveAccount === 'function')
+    ? GameState.getActiveAccount()
+    : null;
   return {
     version: SAVE_VERSION,
     story: (typeof getStoryDataForSave === 'function') ? getStoryDataForSave() : null,
@@ -176,6 +179,12 @@ function _gatherSaveData() {
     },
     coins:     (typeof playerCoins        !== 'undefined') ? playerCoins                  : 0,
     cosmetics: (typeof unlockedCosmetics  !== 'undefined') ? unlockedCosmetics.slice()    : [],
+    meta: {
+      updatedAt: (active && active.data && active.data.meta && typeof active.data.meta.updatedAt === 'number')
+        ? active.data.meta.updatedAt
+        : 0,
+      source: (active && active.data && active.data.meta && active.data.meta.source) || 'local',
+    },
     settings: {
       sfxVol:    parseFloat(localStorage.getItem('smc_sfxVol') || '0.35'),
       sfxMute:   (localStorage.getItem('smc_sfxMute')    === '1'),
@@ -469,6 +478,13 @@ function saveGame() {
     const acct = GameState.getActiveAccount();
     if (!acct) return;
     const data = _gatherSaveData();
+    const preserveTs = (window.__SMB_PENDING_SAVE_TIMESTAMP !== undefined);
+    data.meta = {
+      updatedAt: preserveTs
+        ? Number(window.__SMB_PENDING_SAVE_TIMESTAMP) || 0
+        : Date.now(),
+      source: 'local',
+    };
     // Preserve the _legacyCleared flag so cleanup is not undone on next load
     if (acct.data && acct.data._legacyCleared) data._legacyCleared = true;
     GameState.update(function(s) {
@@ -476,6 +492,9 @@ function saveGame() {
       if (a) a.data = data;
     });
     GameState.save();
+    if (!window.__SMB_SUPPRESS_CLOUD_SYNC && window.SupabaseBridge && typeof SupabaseBridge.queueSyncFromRuntime === 'function') {
+      SupabaseBridge.queueSyncFromRuntime(data);
+    }
   } catch(e) {
     console.warn('[SMC Save] Save failed:', e);
   }
@@ -500,6 +519,7 @@ function loadGame() {
       }
       _applySaveData(data);
       _refreshRuntimeFromSave(data);
+      _queueCloudReconcile();
       return;
     }
 
@@ -514,7 +534,15 @@ function loadGame() {
           _applySaveData(data);
           _refreshRuntimeFromSave(data);
           // One-time migration: write into GameState so future loads use the new path
-          saveGame();
+          window.__SMB_SUPPRESS_CLOUD_SYNC = true;
+          window.__SMB_PENDING_SAVE_TIMESTAMP = 0;
+          try {
+            saveGame();
+          } finally {
+            window.__SMB_SUPPRESS_CLOUD_SYNC = false;
+            window.__SMB_PENDING_SAVE_TIMESTAMP = undefined;
+          }
+          _queueCloudReconcile();
           return;
         }
       } catch(e) {
@@ -539,6 +567,7 @@ function loadGame() {
         typeof _defaultStory2Progress === 'function') {
       restoreStoryDataFromSave(_defaultStory2Progress());
     }
+    _queueCloudReconcile();
   } catch(e) {
     console.warn('[SMC Save] Load failed:', e);
   }
@@ -674,3 +703,13 @@ setInterval(saveGame, 15000);
 
 // ── Load on startup ───────────────────────────────────────────────────────────
 loadGame();
+
+function _queueCloudReconcile() {
+  if (window.__SMB_SUPPRESS_CLOUD_SYNC) return;
+  if (!window.SupabaseBridge || typeof SupabaseBridge.reconcileActiveSave !== 'function') return;
+  setTimeout(function() {
+    SupabaseBridge.reconcileActiveSave().catch(function(e) {
+      console.warn('[SMC Save] Cloud reconcile failed:', e);
+    });
+  }, 0);
+}
