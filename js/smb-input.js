@@ -13,6 +13,7 @@ const SCROLL_BLOCK = new Set([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRi
 // bindings. Only single alphabetic characters are lowercased; everything else
 // (Arrow*, Enter, ' ', '.', '/', etc.) is returned unchanged.
 function _normKey(k) {
+  if (!k) return k;
   return (k.length === 1 && k >= 'A' && k <= 'Z') ? k.toLowerCase() : k;
 }
 
