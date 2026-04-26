@@ -608,12 +608,20 @@ function _storyBuildShopItems() {
 
 // ── Save integration ─────────────────────────────────────────────────────────
 function getStoryDataForSave() {
-  return typeof _story2 !== 'undefined' ? JSON.parse(JSON.stringify(_story2)) : null;
+  if (typeof _story2 === 'undefined') return null;
+  if (!_story2.meta || typeof _story2.meta !== 'object') _story2.meta = {};
+  if (typeof _story2.meta.updatedAt !== 'number') {
+    _story2.meta.updatedAt = (typeof window.__SMB_PENDING_SAVE_TIMESTAMP === 'number' && window.__SMB_PENDING_SAVE_TIMESTAMP > 0)
+      ? window.__SMB_PENDING_SAVE_TIMESTAMP
+      : Date.now();
+  }
+  _story2.meta.source = 'local';
+  return JSON.parse(JSON.stringify(_story2));
 }
 
 function restoreStoryDataFromSave(data) {
   if (!data || !data.defeated) return;
-  Object.assign(_story2, data);
+  _story2 = _normalizeStory2Progress(data);
   _saveStory2();
 }
 
@@ -779,25 +787,106 @@ function _defaultStory2Progress() {
   };
 }
 
+function _normalizeStory2Progress(data) {
+  const base = _defaultStory2Progress();
+  if (!data || typeof data !== 'object') return base;
+  const out = JSON.parse(JSON.stringify(base));
+  if (typeof data.chapter === 'number') out.chapter = data.chapter;
+  if (typeof data.tokens === 'number') out.tokens = data.tokens;
+  if (typeof data.exp === 'number') out.exp = data.exp;
+  if (Array.isArray(data.blueprints)) out.blueprints = data.blueprints.slice();
+  if (Array.isArray(data.unlockedAbilities)) out.unlockedAbilities = data.unlockedAbilities.slice();
+  if (data.skillTree && typeof data.skillTree === 'object') out.skillTree = Object.assign({}, data.skillTree);
+  if (Array.isArray(data.defeated)) out.defeated = data.defeated.slice();
+  if (typeof data.storyComplete === 'boolean') out.storyComplete = data.storyComplete;
+  if (data.runState && typeof data.runState === 'object') out.runState = Object.assign({}, base.runState, data.runState);
+  if (data.metaUpgrades && typeof data.metaUpgrades === 'object') out.metaUpgrades = Object.assign({}, base.metaUpgrades, data.metaUpgrades);
+  if (data.arcCollapsed && typeof data.arcCollapsed === 'object') out.arcCollapsed = Object.assign({}, data.arcCollapsed);
+  if (data.actExpanded && typeof data.actExpanded === 'object') out.actExpanded = Object.assign({}, data.actExpanded);
+  if (data.meta && typeof data.meta === 'object') out.meta = Object.assign({}, data.meta);
+  return out;
+}
+
+function _story2UpdatedAt(data) {
+  return data && data.meta && typeof data.meta.updatedAt === 'number' ? data.meta.updatedAt : 0;
+}
+
+function _story2Meaningful(data) {
+  if (!data || typeof data !== 'object') return false;
+  if ((typeof data.storyComplete === 'boolean' && data.storyComplete) ||
+      (typeof data.tokens === 'number' && data.tokens > 0) ||
+      (typeof data.exp === 'number' && data.exp > 0)) return true;
+  if (Array.isArray(data.defeated) && data.defeated.length > 0) return true;
+  if (Array.isArray(data.blueprints) && data.blueprints.length > 0) return true;
+  if (Array.isArray(data.unlockedAbilities) && data.unlockedAbilities.length > 0) return true;
+  if (data.skillTree && Object.keys(data.skillTree).length > 0) return true;
+  if (data.runState && ((typeof data.runState.healthPct === 'number' && data.runState.healthPct !== 1) ||
+      (typeof data.runState.noDeathChain === 'number' && data.runState.noDeathChain > 0))) return true;
+  if (data.metaUpgrades && ((data.metaUpgrades.damage || 0) > 0 || (data.metaUpgrades.survivability || 0) > 0 || (data.metaUpgrades.healUses || 0) > 0)) return true;
+  return false;
+}
+
+function _pickInitialStory2(localStory, accountStory, accountTs) {
+  const local = _normalizeStory2Progress(localStory);
+  const cloud = _normalizeStory2Progress(accountStory);
+  const localHas = _story2Meaningful(localStory);
+  const cloudHas = _story2Meaningful(accountStory);
+
+  if (cloudHas && !localHas) return cloud;
+  if (localHas && !cloudHas) return local;
+  if (cloudHas && localHas) {
+    const localTs = _story2UpdatedAt(localStory);
+    const cloudTs = Math.max(_story2UpdatedAt(accountStory), accountTs || 0);
+    if (cloudTs > localTs) return cloud;
+    if (localTs > cloudTs) return local;
+
+    const localScore = (Array.isArray(local.defeated) ? local.defeated.length : 0)
+      + (Array.isArray(local.blueprints) ? local.blueprints.length : 0)
+      + (Array.isArray(local.unlockedAbilities) ? local.unlockedAbilities.length : 0)
+      + (local.tokens || 0)
+      + (local.exp || 0);
+    const cloudScore = (Array.isArray(cloud.defeated) ? cloud.defeated.length : 0)
+      + (Array.isArray(cloud.blueprints) ? cloud.blueprints.length : 0)
+      + (Array.isArray(cloud.unlockedAbilities) ? cloud.unlockedAbilities.length : 0)
+      + (cloud.tokens || 0)
+      + (cloud.exp || 0);
+    return cloudScore >= localScore ? cloud : local;
+  }
+  return localHas ? local : (cloudHas ? cloud : local);
+}
+
 let _story2 = (function() {
   try {
     const raw = localStorage.getItem(_STORY2_KEY);
-    if (!raw) return _defaultStory2Progress();
-    const p = JSON.parse(raw);
-    if (!p || !Array.isArray(p.defeated)) return _defaultStory2Progress();
-    // Migration: ensure v3 fields exist on old saves
-    if (!p.arcCollapsed || typeof p.arcCollapsed !== 'object') p.arcCollapsed = {};
-    if (!p.actExpanded  || typeof p.actExpanded  !== 'object') p.actExpanded  = {};
-    if (!p.runState || typeof p.runState !== 'object') p.runState = { healthPct: 1, noDeathChain: 0 };
-    if (!p.metaUpgrades || typeof p.metaUpgrades !== 'object') p.metaUpgrades = { damage: 0, survivability: 0, healUses: 0 };
-    if (typeof p.exp !== 'number') p.exp = 0;
-    if (!p.skillTree || typeof p.skillTree !== 'object') p.skillTree = {};
-    return p;
+    const localStory = raw ? JSON.parse(raw) : null;
+    const acct = (window.GameState && typeof GameState.getActiveAccount === 'function') ? GameState.getActiveAccount() : null;
+    const accountStory = acct && acct.data && acct.data.story ? acct.data.story : null;
+    const accountTs = acct && acct.data && acct.data.meta && typeof acct.data.meta.updatedAt === 'number' ? acct.data.meta.updatedAt : 0;
+    const chosen = _pickInitialStory2(localStory, accountStory, accountTs);
+    return chosen || _defaultStory2Progress();
   } catch(e) { return _defaultStory2Progress(); }
 })();
 
+try { _saveStory2(); } catch(e) {}
+
+if (window.SupabaseBridge && typeof SupabaseBridge.reconcileActiveSave === 'function') {
+  setTimeout(function() {
+    if (typeof SupabaseBridge.isRuntimeReady === 'function' && !SupabaseBridge.isRuntimeReady()) return;
+    SupabaseBridge.reconcileActiveSave().catch(function(e) {
+      console.warn('[story-config] Deferred cloud reconcile failed:', e);
+    });
+  }, 0);
+}
+
 function _saveStory2() {
-  try { localStorage.setItem(_STORY2_KEY, JSON.stringify(_story2)); } catch(e) {}
+  try {
+    if (!_story2.meta || typeof _story2.meta !== 'object') _story2.meta = {};
+    _story2.meta.updatedAt = (typeof window.__SMB_PENDING_SAVE_TIMESTAMP === 'number' && window.__SMB_PENDING_SAVE_TIMESTAMP > 0)
+      ? window.__SMB_PENDING_SAVE_TIMESTAMP
+      : Date.now();
+    _story2.meta.source = 'local';
+    localStorage.setItem(_STORY2_KEY, JSON.stringify(_story2));
+  } catch(e) {}
 }
 
 // ── Act/Arc hierarchy helpers ─────────────────────────────────────────────────

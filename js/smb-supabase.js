@@ -36,24 +36,28 @@ const SupabaseBridge = (() => {
   }
 
   function _menuButtonLabel() {
-    if (!isAvailable()) return '☁️ Cloud';
-    if (!_ready) return '☁️ Cloud...';
-    if (!_session || !_user) return '☁️ Cloud';
+    if (!isAvailable()) return '👤 Account & Saves';
+    if (!_ready) return '👤 Account & Saves...';
+    if (!_session || !_user) return '👤 Account & Saves';
     const label = _user.email || _user.user_metadata?.full_name || _user.id.slice(0, 8);
-    return '☁️ ' + String(label).split('@')[0].slice(0, 18);
+    return '👤 ' + String(label).split('@')[0].slice(0, 18);
   }
 
   function _saveRuntimeReady() {
-    return typeof window._gatherSaveData === 'function' && typeof window.saveGame === 'function';
+    return isRuntimeReady() && typeof window._gatherSaveData === 'function' && typeof window.saveGame === 'function';
+  }
+
+  function isRuntimeReady() {
+    return typeof window.getStoryDataForSave === 'function' && typeof window.restoreStoryDataFromSave === 'function';
   }
 
   function _updateMenuButton() {
-    const btn = document.getElementById('cloudAuthBtn');
+    const btn = document.getElementById('accountsSavesBtn') || document.getElementById('cloudAuthBtn');
     if (!btn) return;
     btn.textContent = _menuButtonLabel();
     btn.title = _session
       ? ('Signed in as ' + (_user?.email || 'cloud user'))
-      : (isAvailable() ? 'Sign in or create a cloud save account' : 'Supabase config missing');
+      : (isAvailable() ? 'Open account, local save, and cloud sync settings' : 'Supabase config missing');
   }
 
   function _emit(event, payload) {
@@ -218,6 +222,168 @@ const SupabaseBridge = (() => {
     const ts = row.client_updated_at || row.updated_at || row.created_at || null;
     const parsed = ts ? Date.parse(ts) : 0;
     return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function _cloneSave(save) {
+    if (!save) return null;
+    try { return JSON.parse(JSON.stringify(save)); } catch (e) { return null; }
+  }
+
+  function _uniqMerge(primary, secondary) {
+    const out = [];
+    const push = function(value) {
+      if (value === null || value === undefined || value === '') return;
+      const key = typeof value === 'number' ? String(value) : String(value).trim();
+      if (!key) return;
+      if (out.indexOf(key) === -1) out.push(key);
+    };
+    (Array.isArray(primary) ? primary : []).forEach(push);
+    (Array.isArray(secondary) ? secondary : []).forEach(push);
+    return out;
+  }
+
+  function _fractureMap(save) {
+    const out = {};
+    const add = function(entry) {
+      if (!entry || entry.id === undefined || entry.id === null) return;
+      const id = String(entry.id);
+      out[id] = {
+        id: id,
+        unlocked: !!entry.unlocked,
+        previewed: !!entry.previewed,
+        completed: !!entry.completed,
+      };
+    };
+    if (save && save.progression && Array.isArray(save.progression.fractures)) save.progression.fractures.forEach(add);
+    return out;
+  }
+
+  function _saveMeaningfulScore(save) {
+    if (!save || typeof save !== 'object') return 0;
+    let score = 0;
+    if (typeof save.coins === 'number' && save.coins > 0) score += 1;
+    if (Array.isArray(save.cosmetics) && save.cosmetics.length > 0) score += 2;
+    if (save.unlocks) {
+      if (save.unlocks.bossBeaten) score += 2;
+      if (save.unlocks.trueform) score += 3;
+      if (save.unlocks.megaknight) score += 2;
+      if (Array.isArray(save.unlocks.letters) && save.unlocks.letters.length > 0) score += 1;
+      if (Array.isArray(save.unlocks.achievements) && save.unlocks.achievements.length > 0) score += 1;
+      if (save.unlocks.sovereignBeaten) score += 2;
+      if (save.unlocks.storyOnline) score += 2;
+      if (save.unlocks.tfEndingSeen) score += 1;
+      if (save.unlocks.damnationScar) score += 1;
+      if (save.unlocks.storyDodgeUnlocked) score += 1;
+      if (save.unlocks.paradoxCompanion) score += 1;
+      if (save.unlocks.interTravel) score += 1;
+      if (save.unlocks.patrolMode) score += 1;
+      if (save.unlocks.godEncountered) score += 1;
+      if (save.unlocks.godDefeated) score += 1;
+    }
+    if (save.storyProgress) {
+      if (typeof save.storyProgress.act === 'number' && save.storyProgress.act > 0) score += 2;
+      if (typeof save.storyProgress.chapter === 'number' && save.storyProgress.chapter > 0) score += 1;
+      if (save.storyProgress.flags && Object.keys(save.storyProgress.flags).length > 0) score += 1;
+    }
+    if (save.story) {
+      if (Array.isArray(save.story.defeated) && save.story.defeated.length > 0) score += 3;
+      if (Array.isArray(save.story.blueprints) && save.story.blueprints.length > 0) score += 1;
+      if (Array.isArray(save.story.unlockedAbilities) && save.story.unlockedAbilities.length > 0) score += 1;
+      if (save.story.storyComplete) score += 3;
+    }
+    if (save.progression) {
+      if (save.progression.ship && save.progression.ship.built) score += 2;
+      if (Array.isArray(save.progression.fractures) && save.progression.fractures.some(function(f) { return f && (f.unlocked || f.previewed || f.completed); })) score += 2;
+      if (typeof save.progression.motivationStage === 'number' && save.progression.motivationStage > 0) score += 1;
+    }
+    if (save.settings) {
+      if (typeof save.settings.sfxVol === 'number' && save.settings.sfxVol !== 0.35) score += 1;
+      if (save.settings.sfxMute || save.settings.musicMute || save.settings.ragdoll) score += 1;
+    }
+    return score;
+  }
+
+  function _mergeSaveData(primary, secondary) {
+    const out = _cloneSave(primary) || _cloneSave(secondary) || null;
+    if (!out || !secondary) return out;
+    const other = secondary;
+    out.version = Math.max(out.version || 3, other.version || 3);
+
+    out.unlocks = Object.assign({}, other.unlocks || {}, out.unlocks || {});
+    if (other.unlocks) {
+      const u = out.unlocks;
+      u.bossBeaten         = !!(u.bossBeaten         || other.unlocks.bossBeaten);
+      u.trueform           = !!(u.trueform           || other.unlocks.trueform);
+      u.megaknight         = !!(u.megaknight         || other.unlocks.megaknight);
+      u.sovereignBeaten    = !!(u.sovereignBeaten    || other.unlocks.sovereignBeaten);
+      u.storyOnline        = !!(u.storyOnline        || other.unlocks.storyOnline);
+      u.tfEndingSeen       = !!(u.tfEndingSeen       || other.unlocks.tfEndingSeen);
+      u.damnationScar      = !!(u.damnationScar      || other.unlocks.damnationScar);
+      u.storyDodgeUnlocked = !!(u.storyDodgeUnlocked || other.unlocks.storyDodgeUnlocked);
+      u.paradoxCompanion   = !!(u.paradoxCompanion   || other.unlocks.paradoxCompanion);
+      u.interTravel        = !!(u.interTravel        || other.unlocks.interTravel);
+      u.patrolMode         = !!(u.patrolMode         || other.unlocks.patrolMode);
+      u.godEncountered     = !!(u.godEncountered     || other.unlocks.godEncountered);
+      u.godDefeated        = !!(u.godDefeated        || other.unlocks.godDefeated);
+      u.letters            = _uniqMerge(u.letters, other.unlocks.letters);
+      u.achievements       = _uniqMerge(u.achievements, other.unlocks.achievements);
+    }
+
+    out.cosmetics = _uniqMerge(out.cosmetics, other.cosmetics);
+
+    if (other.storyProgress) {
+      out.storyProgress = out.storyProgress || {};
+      out.storyProgress.flags = Object.assign({}, other.storyProgress.flags || {}, out.storyProgress.flags || {});
+    }
+    if (other.story && out.story) {
+      out.story.defeated = _uniqMerge(out.story.defeated, other.story.defeated).map(function(v) {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : v;
+      }).sort(function(a, b) { return Number(a) - Number(b); });
+      out.story.blueprints = _uniqMerge(out.story.blueprints, other.story.blueprints);
+      out.story.unlockedAbilities = _uniqMerge(out.story.unlockedAbilities, other.story.unlockedAbilities);
+      out.story.storyComplete = !!(out.story.storyComplete || other.story.storyComplete);
+    }
+    if (other.progression) {
+      out.progression = out.progression || {};
+      if (other.progression.ship) {
+        out.progression.ship = out.progression.ship || {};
+        out.progression.ship.built = !!((out.progression.ship && out.progression.ship.built) || other.progression.ship.built);
+        if (other.progression.ship.parts) {
+          out.progression.ship.parts = Object.assign({}, other.progression.ship.parts, out.progression.ship.parts || {});
+        }
+      }
+      const mineFract = _fractureMap(out);
+      const otherFract = _fractureMap(other);
+      const mergedFractures = {};
+      Object.keys(otherFract).concat(Object.keys(mineFract)).forEach(function(id) {
+        const mine = mineFract[id] || { id: id, unlocked: false, previewed: false, completed: false };
+        const theirs = otherFract[id] || { id: id, unlocked: false, previewed: false, completed: false };
+        mergedFractures[id] = {
+          id: id,
+          unlocked:  !!(mine.unlocked  || theirs.unlocked),
+          previewed: !!(mine.previewed || theirs.previewed),
+          completed:  !!(mine.completed  || theirs.completed),
+        };
+      });
+      if (Object.keys(mergedFractures).length > 0) {
+        out.progression.fractures = Object.values(mergedFractures);
+      }
+      if (typeof other.progression.motivationStage === 'number') {
+        const mineStage = typeof out.progression.motivationStage === 'number' ? out.progression.motivationStage : 0;
+        out.progression.motivationStage = Math.max(mineStage, other.progression.motivationStage);
+      }
+    }
+
+    if (other.settings) {
+      out.settings = out.settings || {};
+      if (typeof out.settings.sfxVol !== 'number') out.settings.sfxVol = other.settings.sfxVol;
+      if (typeof out.settings.sfxMute === 'undefined') out.settings.sfxMute = !!other.settings.sfxMute;
+      if (typeof out.settings.musicMute === 'undefined') out.settings.musicMute = !!other.settings.musicMute;
+      if (typeof out.settings.ragdoll === 'undefined') out.settings.ragdoll = !!other.settings.ragdoll;
+    }
+
+    return out;
   }
 
   function _coalesceList(primary, secondary) {
@@ -435,10 +601,19 @@ const SupabaseBridge = (() => {
     const remote = await fetchRemoteSave();
     const localTs = _localSaveTimestamp(local);
     const remoteTs = _saveTimestampFromRow(remote);
+    const localScore = _saveMeaningfulScore(local);
+    const remoteScore = _saveMeaningfulScore(remote && remote.save_data ? remote.save_data : null);
+    const hasRemote = !!(remote && remote.save_data);
+    const chooseRemote = hasRemote && (
+      (!local && remoteScore > 0) ||
+      (remoteScore > 0 && localScore === 0) ||
+      (remoteScore > 0 && localScore > 0 && remoteTs >= localTs)
+    );
 
-    if (remote && remote.save_data && (!local || remoteTs >= localTs)) {
-      if (typeof window._applySaveData === 'function') window._applySaveData(remote.save_data);
-      if (typeof window._refreshRuntimeFromSave === 'function') window._refreshRuntimeFromSave(remote.save_data);
+    if (chooseRemote) {
+      const merged = local ? _mergeSaveData(remote.save_data, local) : _cloneSave(remote.save_data);
+      if (merged && typeof window._applySaveData === 'function') window._applySaveData(merged);
+      if (merged && typeof window._refreshRuntimeFromSave === 'function') window._refreshRuntimeFromSave(merged);
       if (typeof window.GameState !== 'undefined' && typeof saveGame === 'function') {
         window.__SMB_SUPPRESS_CLOUD_SYNC = true;
         window.__SMB_PENDING_SAVE_TIMESTAMP = remoteTs || Date.now();
@@ -452,7 +627,8 @@ const SupabaseBridge = (() => {
     }
 
     if (local) {
-      await syncFromRuntime(local);
+      const merged = hasRemote ? _mergeSaveData(local, remote.save_data) : local;
+      await syncFromRuntime(merged);
       _emit('loaded_local', { updatedAt: localTs || null });
       return { source: 'local' };
     }
@@ -506,6 +682,7 @@ const SupabaseBridge = (() => {
 
   return {
     isAvailable,
+    isRuntimeReady,
     ensureReady,
     bootstrap,
     getClient,

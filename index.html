@@ -129,9 +129,12 @@
     <h1 class="game-title">STICKMAN BATTLES</h1>
     <p class="game-subtitle">Local Multiplayer Platform Fighter</p>
     <p id="gameVersionLabel" style="font-size:0.65rem;color:rgba(255,255,255,0.25);letter-spacing:1px;margin:-6px 0 4px;text-align:center;">v2.6.0</p>
-    <!-- Store button -->
-    <div style="text-align:center;margin:2px 0 4px;">
-      <button class="btn" onclick="openStore()" style="font-size:0.72rem;padding:3px 14px;background:rgba(255,180,0,0.15);border-color:rgba(255,180,0,0.45);color:#ffcc66;">🏪 Store <span id="coinDisplay" style="color:#ffdd44;font-weight:bold;"></span></button>
+    <!-- HOME QUICK NAV -->
+    <div class="home-quicknav">
+      <button id="accountsSavesBtn" class="home-nav-btn" onclick="openAccountsModal()" title="Open account, local save, and cloud sync settings">&#9729; Account &amp; Saves</button>
+      <button class="home-nav-btn" onclick="openStore()">&#127811; Store <span id="coinDisplay" style="color:#ffdd44;font-weight:bold;font-size:0.8em;"></span></button>
+      <button class="home-nav-btn" onclick="openSettingsModal()">&#9881; Settings</button>
+      <button class="home-nav-btn" onclick="openCommunityModal()">&#128172; Community</button>
     </div>
 
     <!-- TRUE FORM HINT — hidden once unlocked -->
@@ -434,90 +437,9 @@
       </label>
     </div>
 
-    <!-- SETTINGS -->
+    <!-- SETTINGS shortcut — opens the settings modal -->
     <div class="settings-section">
-      <button class="btn settings-toggle" onclick="toggleSettings()">Settings &nbsp;<span id="settingsVersionLabel" style="font-size:0.65rem;color:#334488;letter-spacing:1px;"></span></button>
-      <div id="settingsPanel" class="settings-panel">
-        <div class="settings-grid">
-          <label class="setting-item">
-            <input type="checkbox" id="settingParticles" checked onchange="updateSettings()">
-            <span>Particles</span>
-          </label>
-          <label class="setting-item">
-            <input type="checkbox" id="settingShake" checked onchange="updateSettings()">
-            <span>Screen Shake</span>
-          </label>
-          <label class="setting-item">
-            <input type="checkbox" id="settingDmgNums" checked onchange="updateSettings()">
-            <span>Damage Numbers</span>
-          </label>
-          <label class="setting-item">
-            <input type="checkbox" id="settingLandDust" checked onchange="updateSettings()">
-            <span>Landing Dust</span>
-          </label>
-          <label class="setting-item">
-            <input type="checkbox" id="settingFinishers" checked onchange="updateSettings()">
-            <span>Finishers ⚔️</span>
-          </label>
-        </div>
-        <!-- SOUND CONTROLS -->
-        <div style="margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <button id="sfxMuteBtn" class="btn settings-toggle" onclick="toggleSfxMute()" style="min-width:130px;">🔊 Sound: On</button>
-          <label style="font-size:0.78rem;color:#aaa;display:flex;align-items:center;gap:6px;">
-            Vol <input type="range" min="0" max="1" step="0.05" value="0.35" style="width:80px;accent-color:#8866ff;"
-              oninput="setSfxVolume(parseFloat(this.value))">
-          </label>
-          <button id="musicMuteBtn" class="btn settings-toggle" onclick="MusicManager.toggle();this.textContent=MusicManager.isMuted()?'🎵 Music: Off':'🎵 Music: On'" style="min-width:130px;">🎵 Music: On</button>
-        </div>
-        <!-- ADVANCED SETTINGS -->
-        <div style="margin-top:8px;">
-          <button class="btn settings-toggle" onclick="toggleAdvanced()">Advanced</button>
-          <div id="advancedPanel" class="settings-panel" style="display:none;margin-top:6px;">
-            <div class="settings-grid">
-              <label class="setting-item">
-                <input type="checkbox" id="settingBossAura" checked onchange="updateSettings()">
-                <span>Boss Aura</span>
-              </label>
-              <label class="setting-item">
-                <input type="checkbox" id="settingBotPortal" checked onchange="updateSettings()">
-                <span>Bot Portal FX</span>
-              </label>
-              <label class="setting-item">
-                <input type="checkbox" id="settingPhaseFlash" checked onchange="updateSettings()">
-                <span>Phase Flash</span>
-              </label>
-            </div>
-          </div>
-        </div>
-        <div id="resetConfirmRow" style="display:none; margin-top:8px; padding:8px; background:rgba(255,50,50,0.12); border-radius:6px; border:1px solid rgba(255,80,80,0.3);">
-          <span style="font-size:0.75rem;color:#ff8888;">Reset all progress (boss beaten, letters, true form)?</span>
-          <div style="display:flex;gap:6px;margin-top:6px;">
-            <button class="btn" onclick="confirmResetProgress()" style="background:rgba(200,0,0,0.7);font-size:0.72rem;padding:4px 12px;">Yes, Reset</button>
-            <button class="btn" onclick="document.getElementById('resetConfirmRow').style.display='none'" style="font-size:0.72rem;padding:4px 12px;">Cancel</button>
-          </div>
-        </div>
-        <!-- PERFORMANCE MODE -->
-        <div style="margin-top:8px;">
-          <button id="perfModeBtn" class="btn settings-toggle" onclick="togglePerformanceMode()" style="color:#88ffaa;border-color:rgba(80,255,120,0.4);" title="Disable all visual effects for max FPS">⚡ Performance Mode: Off</button>
-        </div>
-        <!-- STATS LOG + ACHIEVEMENTS + RESET -->
-        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
-          <button class="btn settings-toggle" onclick="toggleStatsLog()">Stats Log</button>
-          <button class="btn settings-toggle" onclick="showAchievementsModal()" style="color:#ffcc00;border-color:rgba(255,200,0,0.4);">🏆 Achievements</button>
-          <button id="cloudAuthBtn" class="btn settings-toggle" onclick="openAccountsModal()" style="color:#88ddff;border-color:rgba(80,180,255,0.4);" title="Sign in or create a cloud save account">☁️ Cloud</button>
-          <button class="btn settings-toggle" onclick="openAccountsModal()" style="color:#aaddff;border-color:rgba(100,180,255,0.4);">👤 Accounts</button>
-          <button class="btn settings-toggle" onclick="document.getElementById('resetConfirmRow').style.display='block'" style="color:#ff8888;border-color:rgba(255,80,80,0.4);">Reset Progress</button>
-        </div>
-        <!-- SAVE EXPORT / IMPORT -->
-        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
-          <button class="btn settings-toggle" onclick="exportSave()" style="color:#88ffcc;border-color:rgba(80,255,180,0.4);" title="Copy save to clipboard">📋 Copy Save</button>
-          <button class="btn settings-toggle" onclick="downloadSave()" style="color:#88ffcc;border-color:rgba(80,255,180,0.4);" title="Download save as file">💾 Download Save</button>
-          <button class="btn settings-toggle" onclick="openImportSaveModal()" style="color:#88ccff;border-color:rgba(80,160,255,0.4);" title="Paste a save string">📂 Import Save</button>
-        </div>
-        <!-- codeInput / codeMessage kept for syncCodeInput() compatibility -->
-        <input type="text" id="codeInput" style="display:none" readonly>
-        <div id="codeMessage" class="code-message"></div>
-      </div>
+      <button class="btn settings-toggle" onclick="openSettingsModal()">&#9881; Settings <span id="settingsVersionLabel" style="font-size:0.65rem;color:#334488;letter-spacing:1px;"></span></button>
     </div>
 
     <!-- START + FULLSCREEN row -->
@@ -541,27 +463,16 @@
       </div>
     </details>
 
-    <!-- Footer row: links + changelog -->
-    <div style="display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;padding-bottom:4px;">
-      <a href="https://docs.google.com/forms/d/e/1FAIpQLSfcW-7Ywj5lu8yXo3Z7rXloq4HF9hm7WAHtTrimvOrU6yccrQ/viewform?usp=header" target="_blank" rel="noopener"
-         style="font-size:0.68rem;color:#ff6666;text-decoration:none;border:1px solid rgba(255,80,80,0.35);border-radius:5px;padding:4px 10px;transition:background 0.15s;"
-         onmouseover="this.style.background='rgba(255,60,60,0.15)'" onmouseout="this.style.background='transparent'">
-        🐛 Bug
-      </a>
-      <a href="https://docs.google.com/forms/d/e/1FAIpQLSd0FTw-TMGY-NMwXITIJy2tyOYZKndnCkj3vyxUzek5L8IVKA/viewform?usp=header" target="_blank" rel="noopener"
-         style="font-size:0.68rem;color:#aaddff;text-decoration:none;border:1px solid rgba(100,180,255,0.35);border-radius:5px;padding:4px 10px;transition:background 0.15s;"
-         onmouseover="this.style.background='rgba(100,180,255,0.12)'" onmouseout="this.style.background='transparent'">
-        💡 Suggest
-      </a>
-      <button onclick="showAchievementsModal()" id="homeAchievementsBtn"
-        style="background:rgba(255,200,0,0.08);border:1px solid rgba(255,200,0,0.35);color:#ffcc00;font-family:inherit;font-size:0.68rem;padding:4px 10px;border-radius:5px;cursor:pointer;transition:background 0.15s;"
-        onmouseover="this.style.background='rgba(255,200,0,0.18)'" onmouseout="this.style.background='rgba(255,200,0,0.08)'">
-        🏆 Achievements
+    <!-- Footer row — condensed -->
+    <div class="menu-footer-row">
+      <button onclick="showAchievementsModal()" id="homeAchievementsBtn" class="footer-pill">
+        &#127942; Achievements
       </button>
-      <button onclick="showChangelogModal()"
-        style="background:rgba(60,100,220,0.08);border:1px solid rgba(80,130,255,0.3);color:#7799ee;font-family:inherit;font-size:0.68rem;padding:4px 10px;border-radius:5px;cursor:pointer;transition:background 0.15s;"
-        onmouseover="this.style.background='rgba(60,100,220,0.18)'" onmouseout="this.style.background='rgba(60,100,220,0.08)'">
-        📋 Updates <span id="homeVersionBadge" style="font-size:0.65rem;color:#4466bb;"></span>
+      <button onclick="showChangelogModal()" class="footer-pill">
+        &#128203; Updates <span id="homeVersionBadge" style="font-size:0.65rem;color:#4466bb;"></span>
+      </button>
+      <button onclick="openCommunityModal()" class="footer-pill" style="color:#9bb0ff;border-color:rgba(88,101,242,0.35);">
+        &#128172; Community
       </button>
     </div>
   </div><!-- /.menu-center -->
@@ -1058,6 +969,183 @@
 })();
 </script>
 
+<!-- ============================================================
+     SETTINGS MODAL
+     ============================================================ -->
+<div id="settingsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:10000;align-items:center;justify-content:center;" onclick="if(event.target===this)closeSettingsModal()">
+  <div class="smb-modal-box" style="width:min(560px,96vw);max-height:90vh;overflow-y:auto;">
+    <div class="smb-modal-header">
+      <span>&#9881; SETTINGS</span>
+      <button class="smb-modal-close" onclick="closeSettingsModal()">&#x2715;</button>
+    </div>
+
+    <!-- GRAPHICS -->
+    <div class="settings-modal-section" id="settingsPanel">
+      <div class="settings-modal-label">Graphics</div>
+      <div class="settings-grid">
+        <label class="setting-item">
+          <input type="checkbox" id="settingParticles" checked onchange="updateSettings()">
+          <span>Particles</span>
+        </label>
+        <label class="setting-item">
+          <input type="checkbox" id="settingShake" checked onchange="updateSettings()">
+          <span>Screen Shake</span>
+        </label>
+        <label class="setting-item">
+          <input type="checkbox" id="settingDmgNums" checked onchange="updateSettings()">
+          <span>Damage Numbers</span>
+        </label>
+        <label class="setting-item">
+          <input type="checkbox" id="settingLandDust" checked onchange="updateSettings()">
+          <span>Landing Dust</span>
+        </label>
+        <label class="setting-item">
+          <input type="checkbox" id="settingFinishers" checked onchange="updateSettings()">
+          <span>Finishers</span>
+        </label>
+      </div>
+      <!-- Performance mode -->
+      <div style="margin-top:8px;">
+        <button id="perfModeBtn" class="btn settings-toggle" onclick="togglePerformanceMode()" style="color:#88ffaa;border-color:rgba(80,255,120,0.4);" title="Disable all visual effects for max FPS">&#9889; Performance Mode: Off</button>
+      </div>
+    </div>
+
+    <!-- AUDIO -->
+    <div class="settings-modal-section">
+      <div class="settings-modal-label">Audio</div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <button id="sfxMuteBtn" class="btn settings-toggle" onclick="toggleSfxMute()" style="min-width:130px;">&#128266; Sound: On</button>
+        <label style="font-size:0.78rem;color:#aaa;display:flex;align-items:center;gap:6px;">
+          Vol <input type="range" min="0" max="1" step="0.05" value="0.35" style="width:80px;accent-color:#8866ff;"
+            oninput="setSfxVolume(parseFloat(this.value))">
+        </label>
+        <button id="musicMuteBtn" class="btn settings-toggle" onclick="MusicManager.toggle();this.textContent=MusicManager.isMuted()?'&#127925; Music: Off':'&#127925; Music: On'" style="min-width:130px;">&#127925; Music: On</button>
+      </div>
+    </div>
+
+    <!-- ACCOUNT & DATA -->
+    <div class="settings-modal-section">
+      <div class="settings-modal-label">Account &amp; Data</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+        <button class="btn settings-toggle" onclick="showAchievementsModal()" style="color:#ffcc00;border-color:rgba(255,200,0,0.4);">&#127942; Achievements</button>
+        <button class="btn settings-toggle" onclick="toggleStatsLog()">Stats Log</button>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn settings-toggle" onclick="exportSave()" style="color:#88ffcc;border-color:rgba(80,255,180,0.4);" title="Copy save to clipboard">&#128203; Copy Save</button>
+        <button class="btn settings-toggle" onclick="downloadSave()" style="color:#88ffcc;border-color:rgba(80,255,180,0.4);" title="Download save as file">&#128190; Download Save</button>
+        <button class="btn settings-toggle" onclick="openImportSaveModal()" style="color:#88ccff;border-color:rgba(80,160,255,0.4);" title="Paste a save string">&#128194; Import Save</button>
+      </div>
+    </div>
+
+    <!-- ADVANCED -->
+    <div class="settings-modal-section">
+      <div class="settings-modal-label">Advanced</div>
+      <button class="btn settings-toggle" onclick="toggleAdvanced()">Show Advanced</button>
+      <div id="advancedPanel" class="settings-panel" style="display:none;margin-top:8px;">
+        <div class="settings-grid">
+          <label class="setting-item">
+            <input type="checkbox" id="settingBossAura" checked onchange="updateSettings()">
+            <span>Boss Aura</span>
+          </label>
+          <label class="setting-item">
+            <input type="checkbox" id="settingBotPortal" checked onchange="updateSettings()">
+            <span>Bot Portal FX</span>
+          </label>
+          <label class="setting-item">
+            <input type="checkbox" id="settingPhaseFlash" checked onchange="updateSettings()">
+            <span>Phase Flash</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESET -->
+    <div class="settings-modal-section" style="border-bottom:none;">
+      <div id="resetConfirmRow" style="display:none;padding:8px;background:rgba(255,50,50,0.12);border-radius:6px;border:1px solid rgba(255,80,80,0.3);margin-bottom:6px;">
+        <span style="font-size:0.75rem;color:#ff8888;">Reset all progress (boss beaten, letters, true form)?</span>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <button class="btn" onclick="confirmResetProgress()" style="background:rgba(200,0,0,0.7);font-size:0.72rem;padding:4px 12px;">Yes, Reset</button>
+          <button class="btn" onclick="document.getElementById('resetConfirmRow').style.display='none'" style="font-size:0.72rem;padding:4px 12px;">Cancel</button>
+        </div>
+      </div>
+      <button class="btn settings-toggle" onclick="document.getElementById('resetConfirmRow').style.display='block'" style="color:#ff8888;border-color:rgba(255,80,80,0.4);">Reset Progress</button>
+    </div>
+
+    <!-- Hidden elements JS needs -->
+    <input type="text" id="codeInput" style="display:none" readonly>
+    <div id="codeMessage" class="code-message"></div>
+  </div>
+</div>
+
+<!-- ============================================================
+     COMMUNITY MODAL
+     ============================================================ -->
+<div id="communityModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:10000;align-items:center;justify-content:center;" onclick="if(event.target===this)closeCommunityModal()">
+  <div class="smb-modal-box" style="width:min(480px,96vw);">
+    <div class="smb-modal-header">
+      <span>&#128172; COMMUNITY</span>
+      <button class="smb-modal-close" onclick="closeCommunityModal()">&#x2715;</button>
+    </div>
+
+    <!-- Discord -->
+    <div class="community-card" style="background:rgba(88,101,242,0.15);border-color:rgba(88,101,242,0.45);">
+      <div class="community-card-icon" style="color:#7289da;">&#128172;</div>
+      <div class="community-card-body">
+        <div class="community-card-title">Join the Discord</div>
+        <div class="community-card-desc">Chat with other players, share clips, report bugs, and get early patch notes.</div>
+        <a class="community-btn discord-btn" href="https://discord.gg/dgmhj33a5H" target="_blank" rel="noopener">Join Community</a>
+      </div>
+    </div>
+
+    <!-- Patch Notes -->
+    <div class="community-card" style="margin-top:10px;background:rgba(0,212,255,0.08);border-color:rgba(0,212,255,0.25);">
+      <div class="community-card-icon" style="color:#00d4ff;">&#128203;</div>
+      <div class="community-card-body">
+        <div class="community-card-title">Patch Notes</div>
+        <div class="community-card-desc">See what changed in the latest update.</div>
+        <button class="community-btn" onclick="closeCommunityModal();showChangelogModal();" style="background:rgba(0,212,255,0.18);border-color:rgba(0,212,255,0.45);color:#00d4ff;">View Patch Notes</button>
+      </div>
+    </div>
+
+    <!-- Events / Suggest -->
+    <div class="community-card" style="margin-top:10px;background:rgba(255,200,0,0.07);border-color:rgba(255,200,0,0.2);">
+      <div class="community-card-icon" style="color:#ffcc00;">&#128640;</div>
+      <div class="community-card-body">
+        <div class="community-card-title">Suggest a Feature</div>
+        <div class="community-card-desc">Have an idea? Send it our way and help shape the game.</div>
+        <a class="community-btn" href="https://docs.google.com/forms/d/e/1FAIpQLSd0FTw-TMGY-NMwXITIJy2tyOYZKndnCkj3vyxUzek5L8IVKA/viewform?usp=header" target="_blank" rel="noopener" style="background:rgba(255,200,0,0.15);border-color:rgba(255,200,0,0.4);color:#ffcc44;">Suggest</a>
+      </div>
+    </div>
+
+    <!-- Bug Report -->
+    <div class="community-card" style="margin-top:10px;background:rgba(255,80,80,0.07);border-color:rgba(255,80,80,0.2);">
+      <div class="community-card-icon" style="color:#ff6666;">&#128027;</div>
+      <div class="community-card-body">
+        <div class="community-card-title">Report a Bug</div>
+        <div class="community-card-desc">Found a problem? Let us know so we can fix it fast.</div>
+        <a class="community-btn" href="https://docs.google.com/forms/d/e/1FAIpQLSfcW-7Ywj5lu8yXo3Z7rXloq4HF9hm7WAHtTrimvOrU6yccrQ/viewform?usp=header" target="_blank" rel="noopener" style="background:rgba(255,80,80,0.15);border-color:rgba(255,80,80,0.4);color:#ff8888;">Report Bug</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     POST-CHAPTER-1 SAVE PROGRESS MODAL
+     ============================================================ -->
+<div id="saveProgressModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:10001;align-items:center;justify-content:center;">
+  <div class="smb-modal-box save-progress-box">
+    <div style="font-size:2rem;margin-bottom:6px;">&#127381;</div>
+    <div class="save-progress-title">Chapter 1 Complete!</div>
+    <div class="save-progress-sub">Save Your Progress Forever</div>
+    <div class="save-progress-body">Create a free account to keep your saves, unlocks, and story progress across every device — no download needed.</div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:20px;">
+      <button class="btn btn-start" onclick="closeSaveProgressModal();openAccountsModal();" style="font-size:0.95rem;padding:12px 24px;letter-spacing:2px;">&#9729; Create Free Account</button>
+      <button class="btn" onclick="closeSaveProgressModal();" style="background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.15);color:#9aa0c0;font-size:0.8rem;padding:8px 20px;">Continue as Guest</button>
+    </div>
+    <div style="margin-top:12px;font-size:0.65rem;color:rgba(150,160,200,0.4);letter-spacing:1px;">Your local progress is always saved. An account adds cloud backup.</div>
+  </div>
+</div>
+
   <!-- GSAP — timeline/tweening library used for cinematic sequencing -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
   <!-- PeerJS — serverless WebRTC peer-to-peer multiplayer -->
@@ -1369,6 +1457,65 @@
       });
     })();
   </script>
+
+<script>
+// ── Community modal ──────────────────────────────────────────────────────────
+function openCommunityModal() {
+  const m = document.getElementById('communityModal');
+  if (m) m.style.display = 'flex';
+}
+function closeCommunityModal() {
+  const m = document.getElementById('communityModal');
+  if (m) m.style.display = 'none';
+}
+
+// ── Save-progress popup ──────────────────────────────────────────────────────
+function showSaveProgressModal() {
+  const m = document.getElementById('saveProgressModal');
+  if (m) m.style.display = 'flex';
+}
+function closeSaveProgressModal() {
+  const m = document.getElementById('saveProgressModal');
+  if (m) m.style.display = 'none';
+  try { localStorage.setItem('smb_savePromptShown', '1'); } catch(e) {}
+}
+
+// Show once after chapter 0 (Chapter 1 in-game) is first cleared and user has no cloud session
+window.addEventListener('load', function() {
+  // Patch story2OnMatchEnd — fires when a story chapter is won
+  const _patchStoryHook = function() {
+    const orig = window.story2OnMatchEnd;
+    if (typeof orig !== 'function') return;
+    window.story2OnMatchEnd = function(ch) {
+      const result = orig.apply(this, arguments);
+      // Only prompt if: chapter 0, first time, no cloud session, not already shown
+      try {
+        const alreadyShown = localStorage.getItem('smb_savePromptShown');
+        if (!alreadyShown && ch && ch.id === 0) {
+          const hasCloud = window.SupabaseBridge && typeof SupabaseBridge.getSession === 'function'
+            ? !!SupabaseBridge.getSession()
+            : false;
+          if (!hasCloud) {
+            setTimeout(showSaveProgressModal, 2200);
+          }
+        }
+      } catch(e) {}
+      return result;
+    };
+  };
+  // Defer until all scripts are loaded
+  setTimeout(_patchStoryHook, 800);
+});
+
+// Close settings/community modals on Escape
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    closeCommunityModal();
+    closeSettingsModal();
+    closeSaveProgressModal();
+  }
+});
+</script>
 
 <!-- ============================================================
      MOBILE ON-SCREEN CONTROLS

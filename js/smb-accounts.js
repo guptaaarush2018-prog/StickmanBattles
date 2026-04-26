@@ -494,7 +494,7 @@ function _acctRenderList(inner) {
     ? '<button onclick="_acctLogout()" style="' + _acctBtnStyle('orange') + ';flex:1;">🔒 Log Out</button>'
     : '';
 
-  inner.innerHTML = '<h3 style="margin:0 0 16px;font-size:1.1rem;color:#88ccff;">👤 Accounts</h3>'
+  inner.innerHTML = '<h3 style="margin:0 0 16px;font-size:1.1rem;color:#88ccff;">👤 Account &amp; Saves</h3>'
     + cloudSection
     + '<div style="max-height:300px;overflow-y:auto;margin-bottom:14px;">' + rows + '</div>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
@@ -537,6 +537,10 @@ function _acctRenderCloudSection() {
         + '</div>'
         + '<div id="_acctCloudMsg" style="min-height:18px;margin-top:6px;font-size:0.76rem;opacity:0.72;"></div>')
     + '<div style="margin-top:6px;font-size:0.72rem;opacity:0.5;line-height:1.4;">Cloud auth uses Supabase sessions. A successful login keeps progress synced on GitHub Pages, itch.io, and Render.</div>'
+    + '<div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">'
+    + '<div style="font-size:0.72rem;opacity:0.58;">Community</div>'
+    + '<button onclick="window.open(\'https://discord.gg/dgmhj33a5H\',\'_blank\',\'noopener\')" style="' + _acctBtnStyle('blue') + '">💬 Discord</button>'
+    + '</div>'
     + '</div>';
 }
 
@@ -752,6 +756,68 @@ async function _acctCloudSyncNow() {
   });
   if (msg) msg.textContent = 'Cloud save synchronized.';
   _acctToast('Cloud save synced.');
+}
+
+function showChapter1SavePrompt() {
+  try {
+    if (window.SupabaseBridge && typeof SupabaseBridge.isSignedIn === 'function' && SupabaseBridge.isSignedIn()) return;
+    if (localStorage.getItem('smc_save_prompt_seen_v1') === '1') return;
+  } catch(e) {}
+
+  let modal = document.getElementById('chapter1SavePromptModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'chapter1SavePromptModal';
+    modal.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.84);z-index:10020;align-items:center;justify-content:center;';
+    modal.addEventListener('click', function(e) { if (e.target === modal) _acctCloseChapter1SavePrompt(); });
+    const inner = document.createElement('div');
+    inner.id = 'chapter1SavePromptInner';
+    inner.style.cssText = [
+      'background:#0b0b1e',
+      'border:1px solid rgba(100,180,255,0.3)',
+      'border-radius:12px',
+      'padding:26px',
+      'width:min(520px,92vw)',
+      'max-height:88vh',
+      'overflow-y:auto',
+      'color:#dde4ff',
+      "font-family:'Segoe UI',Arial,sans-serif",
+      'box-shadow:0 0 40px rgba(0,100,255,0.18)',
+    ].join(';');
+    modal.appendChild(inner);
+    document.body.appendChild(modal);
+  }
+
+  const inner = document.getElementById('chapter1SavePromptInner');
+  if (!inner) return;
+  inner.innerHTML = [
+    '<div style="font-size:1.15rem;font-weight:800;color:#88ccff;margin-bottom:10px;">Save Your Progress Forever</div>',
+    '<div style="font-size:0.84rem;line-height:1.6;opacity:0.82;margin-bottom:16px;">Create a free Stickman Battles account to:<br>- Keep progress forever<br>- Play on any device<br>- Unlock future online features<br>- Join the community</div>',
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">',
+    '<button onclick="_acctOpenCloudSignupFromPrompt()" style="' + _acctBtnStyle('blue') + ';flex:1;">Create Account</button>',
+    '<button onclick="_acctCloseChapter1SavePrompt(true)" style="' + _acctBtnStyle('dim') + '">Later</button>',
+    '<button onclick="window.open(\'https://discord.gg/dgmhj33a5H\',\'_blank\',\'noopener\')" style="' + _acctBtnStyle('purple') + '">💬 Discord</button>',
+    '</div>',
+  ].join('');
+
+  modal.style.display = 'flex';
+}
+
+function _acctOpenCloudSignupFromPrompt() {
+  _acctCloseChapter1SavePrompt(false);
+  openAccountsModal();
+  setTimeout(function() {
+    const email = document.getElementById('_acctCloudEmail');
+    if (email) email.focus();
+  }, 80);
+}
+
+function _acctCloseChapter1SavePrompt(markSeen) {
+  const modal = document.getElementById('chapter1SavePromptModal');
+  if (modal) modal.style.display = 'none';
+  if (markSeen) {
+    try { localStorage.setItem('smc_save_prompt_seen_v1', '1'); } catch(e) {}
+  }
 }
 
 // ── View: Show Recovery Code ──────────────────────────────────────────────────

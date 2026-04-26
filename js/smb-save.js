@@ -707,6 +707,7 @@ loadGame();
 function _queueCloudReconcile() {
   if (window.__SMB_SUPPRESS_CLOUD_SYNC) return;
   if (!window.SupabaseBridge || typeof SupabaseBridge.reconcileActiveSave !== 'function') return;
+  if (typeof SupabaseBridge.isRuntimeReady === 'function' && !SupabaseBridge.isRuntimeReady()) return;
   setTimeout(function() {
     SupabaseBridge.reconcileActiveSave().catch(function(e) {
       console.warn('[SMC Save] Cloud reconcile failed:', e);

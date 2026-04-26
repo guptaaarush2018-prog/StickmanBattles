@@ -1332,6 +1332,9 @@ function _showStory2Victory(ch) {
         _activeStory2Chapter = null;
         storyModeActive = false;
         if (typeof backToMenu === 'function') backToMenu();
+        if (typeof showChapter1SavePrompt === 'function') {
+          setTimeout(() => showChapter1SavePrompt(), 250);
+        }
         _updateStoryCloseBtn();
       };
     } else if (nextCh && !ch.isEpilogue) {
