@@ -638,6 +638,7 @@ const SupabaseBridge = (() => {
 
   function queueSyncFromRuntime(saveOverride) {
     if (!isAvailable()) return;
+    if (!_session || !_user) return;
     _syncQueued = saveOverride || _runtimeSave();
     if (!_syncQueued) return;
     if (_syncTimer) clearTimeout(_syncTimer);

@@ -3,11 +3,63 @@
 
 const SAVE_VERSION = 3;
 const SAVE_KEY     = 'smc_save_v1'; // legacy fallback key (used when AccountManager is absent)
+const CANONICAL_SAVE_KEY = 'smc_save_v1';
 
 // Dynamic key helpers — route through AccountManager when available so each
 // account gets its own isolated save slot.
 function _getSaveKey()   { return (window.AccountManager) ? window.AccountManager.getActiveSaveKey() : SAVE_KEY; }
 function _getBackupKey() { return _getSaveKey() + '_backup'; }
+
+function _parseMaybeEncodedSave(raw) {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') return parsed;
+  } catch(e) {}
+  try {
+    const decoded = JSON.parse(decodeURIComponent(escape(atob(raw))));
+    if (decoded && typeof decoded === 'object') return decoded;
+  } catch(e) {}
+  console.warn('[save] save parse failed', { key: CANONICAL_SAVE_KEY });
+  return null;
+}
+
+function _readCanonicalSave() {
+  try {
+    return _parseMaybeEncodedSave(localStorage.getItem(CANONICAL_SAVE_KEY));
+  } catch(e) {
+    console.warn('[save] save parse failed: canonical save', e);
+    return null;
+  }
+}
+
+function _writeCanonicalSave(data) {
+  try {
+    localStorage.setItem(CANONICAL_SAVE_KEY, JSON.stringify(data));
+    const storyCount = data && data.story && Array.isArray(data.story.defeated) ? data.story.defeated.length : 0;
+    console.info('[save] save written', {
+      key: CANONICAL_SAVE_KEY,
+      updatedAt: data && data.meta ? data.meta.updatedAt : null,
+      storyBeaten: storyCount,
+    });
+  } catch(e) {
+    console.warn('[save] save write failed: canonical save', e);
+  }
+}
+
+function _canonicalSaveMeaningful(data) {
+  if (!data || typeof data !== 'object') return false;
+  if (data.story && Array.isArray(data.story.defeated) && data.story.defeated.length > 0) return true;
+  if (data.story && (data.story.storyComplete || (Array.isArray(data.story.blueprints) && data.story.blueprints.length > 0))) return true;
+  if (data.unlocks) {
+    if (data.unlocks.bossBeaten || data.unlocks.trueform || data.unlocks.megaknight || data.unlocks.sovereignBeaten || data.unlocks.storyOnline || data.unlocks.tfEndingSeen || data.unlocks.damnationScar) return true;
+    if (Array.isArray(data.unlocks.letters) && data.unlocks.letters.length > 0) return true;
+    if (Array.isArray(data.unlocks.achievements) && data.unlocks.achievements.length > 0) return true;
+  }
+  if (typeof data.coins === 'number' && data.coins > 0) return true;
+  if (Array.isArray(data.cosmetics) && data.cosmetics.length > 0) return true;
+  return false;
+}
 
 // ── Default save structure (used for deep-merge / version migrations) ─────────
 const _SAVE_DEFAULTS = {
@@ -492,6 +544,7 @@ function saveGame() {
       if (a) a.data = data;
     });
     GameState.save();
+    _writeCanonicalSave(data);
     if (!window.__SMB_SUPPRESS_CLOUD_SYNC && window.SupabaseBridge && typeof SupabaseBridge.queueSyncFromRuntime === 'function') {
       SupabaseBridge.queueSyncFromRuntime(data);
     }
@@ -504,6 +557,21 @@ function saveGame() {
 function loadGame() {
   try {
     const acct = window.GameState ? GameState.getActiveAccount() : null;
+    const canonical = _readCanonicalSave();
+    if (canonical && _canonicalSaveMeaningful(canonical)) {
+      console.info('[save] save loaded', { key: CANONICAL_SAVE_KEY, updatedAt: canonical.meta && canonical.meta.updatedAt ? canonical.meta.updatedAt : null });
+      _applySaveData(canonical);
+      _refreshRuntimeFromSave(canonical);
+      if (acct && acct.data !== canonical) {
+        GameState.update(function(s) {
+          const a = s.persistent.accounts[s.persistent.activeAccountId];
+          if (a) a.data = canonical;
+        });
+        GameState.save();
+      }
+      _queueCloudReconcile();
+      return;
+    }
 
     // ── Primary path: account.data in GameState ───────────────────────────────
     if (acct && acct.data && typeof acct.data.version === 'number') {
@@ -519,6 +587,11 @@ function loadGame() {
       }
       _applySaveData(data);
       _refreshRuntimeFromSave(data);
+      _writeCanonicalSave(data);
+      console.info('[save] save loaded', {
+        key: 'smb_state',
+        updatedAt: data.meta && data.meta.updatedAt ? data.meta.updatedAt : null,
+      });
       _queueCloudReconcile();
       return;
     }
@@ -533,6 +606,11 @@ function loadGame() {
           if (data.version < SAVE_VERSION) data = _migrateSave(data);
           _applySaveData(data);
           _refreshRuntimeFromSave(data);
+          _writeCanonicalSave(data);
+          console.info('[save] save loaded', {
+            key: legacyKey,
+            updatedAt: data.meta && data.meta.updatedAt ? data.meta.updatedAt : null,
+          });
           // One-time migration: write into GameState so future loads use the new path
           window.__SMB_SUPPRESS_CLOUD_SYNC = true;
           window.__SMB_PENDING_SAVE_TIMESTAMP = 0;
@@ -563,6 +641,7 @@ function loadGame() {
        'smb_damnationScar','smc_storyDodgeUnlocked','smc_paradox_companion']
         .forEach(function(k) { localStorage.removeItem(k); });
     } catch(e) {}
+    console.info('[save] defaults used', { key: CANONICAL_SAVE_KEY });
     if (typeof restoreStoryDataFromSave === 'function' &&
         typeof _defaultStory2Progress === 'function') {
       restoreStoryDataFromSave(_defaultStory2Progress());
@@ -707,6 +786,7 @@ loadGame();
 function _queueCloudReconcile() {
   if (window.__SMB_SUPPRESS_CLOUD_SYNC) return;
   if (!window.SupabaseBridge || typeof SupabaseBridge.reconcileActiveSave !== 'function') return;
+  if (typeof SupabaseBridge.isSignedIn === 'function' && !SupabaseBridge.isSignedIn()) return;
   if (typeof SupabaseBridge.isRuntimeReady === 'function' && !SupabaseBridge.isRuntimeReady()) return;
   setTimeout(function() {
     SupabaseBridge.reconcileActiveSave().catch(function(e) {
