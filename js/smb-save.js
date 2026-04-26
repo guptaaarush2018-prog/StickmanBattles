@@ -86,11 +86,14 @@ function _normalizeAccountSaveShape(data) {
     out.unlocks.achievements = out.achievements.slice();
   }
   if (!Array.isArray(out.cosmetics)) {
-    out.cosmetics = Array.isArray(out.unlockedCosmetics) ? out.unlockedCosmetics.slice() : [];
+    if (Array.isArray(out.unlockedCosmetics)) out.cosmetics = out.unlockedCosmetics.slice();
+    else if (out.unlocks && Array.isArray(out.unlocks.cosmetics)) out.cosmetics = out.unlocks.cosmetics.slice();
+    else out.cosmetics = [];
   }
   if (typeof out.coins !== 'number') {
     if (typeof out.playerCoins === 'number') out.coins = out.playerCoins;
     else if (out.progression && typeof out.progression.coins === 'number') out.coins = out.progression.coins;
+    else if (out.stats && typeof out.stats.coins === 'number') out.coins = out.stats.coins;
     else if (out.story && typeof out.story.coins === 'number') out.coins = out.story.coins;
     else if (typeof out.chapter === 'number' && out.chapter > 0) out.coins = out.coins || 0;
     else out.coins = 0;
@@ -98,6 +101,7 @@ function _normalizeAccountSaveShape(data) {
   if (typeof out.chapter !== 'number') {
     if (out.storyProgress && typeof out.storyProgress.chapter === 'number') out.chapter = out.storyProgress.chapter;
     else if (out.story && typeof out.story.chapter === 'number') out.chapter = out.story.chapter;
+    else if (out.progression && typeof out.progression.chapter === 'number') out.chapter = out.progression.chapter;
     else out.chapter = 0;
   }
   if (out.storyProgress && typeof out.storyProgress === 'object') {
@@ -124,6 +128,10 @@ function _normalizeAccountSaveShape(data) {
     out.chapter = out.storyProgress.chapter;
   }
   return out;
+}
+
+function normalizeSave(raw) {
+  return _normalizeAccountSaveShape(raw);
 }
 
 function _saveSnapshotSummary(data) {
@@ -651,35 +659,58 @@ function loadGame() {
       : _readCanonicalStateRoot();
     const activeId = root && root.activeAccountId ? root.activeAccountId : (acct ? acct.id : null);
     const activeBlob = root && root.accounts && activeId && root.accounts[activeId] ? root.accounts[activeId].data : null;
-    const canonical = _normalizeAccountSaveShape(activeBlob || (root && typeof root.version === 'number' ? root : null));
-    console.info(`[LOAD RAW PATH] active=${activeId || 'none'}`, {
-      hasAccount: !!activeBlob,
+    const rawForNorm = activeBlob || (root && typeof root.version === 'number' ? root : null);
+
+    console.info('[LOAD RAW]', {
+      active: activeId || 'none',
       path: activeBlob ? `smb_state.accounts.${activeId}.data` : (root && typeof root.version === 'number' ? 'smb_state' : 'missing'),
+      version: rawForNorm ? rawForNorm.version : null,
+      raw: JSON.parse(JSON.stringify(rawForNorm || {})),
     });
-    console.info('[LOAD FULL OBJECT]', JSON.parse(JSON.stringify(activeBlob || {})));
+
+    const canonical = _normalizeAccountSaveShape(rawForNorm);
+    const normalizedSummary = canonical ? _saveSnapshotSummary(canonical) : null;
+    console.info('[LOAD NORMALIZED]', normalizedSummary
+      ? { coins: normalizedSummary.coins, chapter: normalizedSummary.chapter, version: canonical.version }
+      : 'null');
+
     if (canonical && _canonicalSaveMeaningful(canonical)) {
-      const summary = _saveSnapshotSummary(canonical);
-      console.info(`[LOAD FOUND] coins=${summary.coins} chapter=${summary.chapter}`);
+      const wasLegacy = rawForNorm && typeof rawForNorm.version === 'number' && rawForNorm.version < SAVE_VERSION;
+      if (wasLegacy) {
+        console.info('[MIGRATED V2 TO V3]', {
+          fromVersion: rawForNorm.version,
+          toVersion: SAVE_VERSION,
+          coins: normalizedSummary.coins,
+          chapter: normalizedSummary.chapter,
+        });
+      }
       _logSaveState('LOAD FINAL', canonical, 'loaded');
-      console.info('[LOAD VERIFIED]', summary);
+      console.info('[LOAD VERIFIED]', normalizedSummary);
       _applySaveData(canonical);
       _refreshRuntimeFromSave(canonical);
-      if (acct && acct.data !== canonical) {
+      if (acct && (acct.data !== canonical || wasLegacy)) {
+        console.info('[SAVE WRITING]', { reason: wasLegacy ? 'migration' : 'normalize', ...normalizedSummary });
         GameState.update(function(s) {
           const a = s.persistent.accounts[s.persistent.activeAccountId];
           if (a) a.data = canonical;
         });
         GameState.save();
+        _writeCanonicalSave(canonical);
       }
       _queueCloudReconcile();
       return;
     }
 
-    // ── Primary path: account.data in GameState ───────────────────────────────
+    // ── Primary path: account.data in GameState (not caught by canonical path) ─
     if (acct && acct.data && typeof acct.data.version === 'number') {
-      const data = acct.data.version < SAVE_VERSION ? _migrateSave(acct.data) : acct.data;
+      const wasLegacy = acct.data.version < SAVE_VERSION;
+      const data = wasLegacy ? _migrateSave(acct.data) : acct.data;
+      if (wasLegacy) {
+        console.info('[MIGRATED V2 TO V3]', { fromVersion: acct.data.version, toVersion: SAVE_VERSION });
+      }
       _applySaveData(data);
       _refreshRuntimeFromSave(data);
+      console.info('[SAVE WRITING]', { reason: 'primary-path', ..._saveSnapshotSummary(data) });
       _writeCanonicalSave(data);
       _logSaveState('LOAD FINAL', data, 'loaded');
       console.info('[LOAD VERIFIED]', _saveSnapshotSummary(data));
@@ -687,10 +718,7 @@ function loadGame() {
       return;
     }
 
-    // ── First run: no save data yet ───────────────────────────────────────────
-    // On initial page load globals are already at defaults, but on an account
-    // switch to a brand-new account we must still reset so the previous account's
-    // globals don't bleed through.
+    // ── First run: no save data exists at all ─────────────────────────────────
     if (typeof resetProgressionGlobals   === 'function') resetProgressionGlobals();
     if (typeof resetAccountScopedGlobals === 'function') resetAccountScopedGlobals();
     console.info('[DEFAULT BLOCKED]', { coins: 0, chapter: 0 });
