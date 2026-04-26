@@ -864,7 +864,7 @@ function _consoleExec(raw) {
     };
     const current = (typeof getCoinBalance === 'function')
       ? getCoinBalance()
-      : parseInt(localStorage.getItem('smb_coins') || '0', 10);
+      : (typeof playerCoins !== 'undefined' ? playerCoins : 0);
 
     if (action === 'show') {
       _consoleOk('Coins: ' + current + ' ⬡');
@@ -879,15 +879,24 @@ function _consoleExec(raw) {
 
     if (action === 'set') {
       if (typeof setCoinBalance === 'function') setCoinBalance(amount);
-      else localStorage.setItem('smb_coins', String(Math.max(0, amount)));
+      else if (typeof playerCoins !== 'undefined') {
+        playerCoins = Math.max(0, amount);
+        if (typeof saveGame === 'function') saveGame();
+      }
       _consoleOk('Coins set to ' + Math.max(0, amount) + ' ⬡');
     } else if (action === 'give' || action === 'add' || action === 'grant') {
       if (typeof awardCoins === 'function') awardCoins(amount);
-      else localStorage.setItem('smb_coins', String(current + amount));
+      else if (typeof playerCoins !== 'undefined') {
+        playerCoins = Math.max(0, current + amount);
+        if (typeof saveGame === 'function') saveGame();
+      }
       _consoleOk('Added ' + amount + ' ⬡. New balance: ' + (current + amount) + ' ⬡');
     } else if (action === 'take' || action === 'remove' || action === 'deduct') {
       if (typeof setCoinBalance === 'function') setCoinBalance(current - amount);
-      else localStorage.setItem('smb_coins', String(Math.max(0, current - amount)));
+      else if (typeof playerCoins !== 'undefined') {
+        playerCoins = Math.max(0, current - amount);
+        if (typeof saveGame === 'function') saveGame();
+      }
       _consoleOk('Removed ' + amount + ' ⬡. New balance: ' + Math.max(0, current - amount) + ' ⬡');
     } else {
       _consoleErr('Usage: coins show|set <n>|give <n>|take <n>');

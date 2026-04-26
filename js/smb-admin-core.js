@@ -532,7 +532,7 @@ function resetAccount(accountId) {
   if (_adminIsActive(accountId)) {
     // Wipe individual smc_* keys that are used as live state.
     ['smc_bossBeaten','smc_trueform','smc_megaknight',
-     'smc_letters','smc_achievements','smc_story2'].forEach(function(k) {
+     'smc_letters','smc_achievements'].forEach(function(k) {
       try { localStorage.removeItem(k); } catch(e) {}
     });
     // Reload save system to restore defaults.

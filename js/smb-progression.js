@@ -453,21 +453,11 @@ function startLabInfiltration() {
 // ============================================================
 
 function _saveShipState() {
-    if (typeof saveGame === 'function') { saveGame(); return; }
-    try { localStorage.setItem('smb_ship', JSON.stringify(SHIP)); } catch (e) {}
+    if (typeof saveGame === 'function') { saveGame(); }
 }
 
 function _saveFractureState() {
-    if (typeof saveGame === 'function') { saveGame(); return; }
-    try {
-        const data = FRACTURES.map(f => ({
-            id:        f.id,
-            unlocked:  f.unlocked,
-            previewed: f.previewed,
-            completed: f.completed
-        }));
-        localStorage.setItem('smb_fractures', JSON.stringify(data));
-    } catch (e) {}
+    if (typeof saveGame === 'function') { saveGame(); }
 }
 
 function _loadProgressionState() {
@@ -499,34 +489,8 @@ function _loadProgressionState() {
             if (typeof _sp.chapter === 'number') STORY_PROGRESS.chapter = _sp.chapter;
             if (_sp.flags && typeof _sp.flags === 'object') Object.assign(STORY_PROGRESS.flags, _sp.flags);
         }
-        return; // applied from account data; skip legacy localStorage
+        return; // applied from account data
     }
-
-    // Fallback: legacy localStorage (first run or pre-migration accounts)
-    try {
-        const ship = localStorage.getItem('smb_ship');
-        if (ship) Object.assign(SHIP, JSON.parse(ship));
-    } catch (e) {}
-
-    try {
-        const frac = localStorage.getItem('smb_fractures');
-        if (frac) {
-            const arr = JSON.parse(frac);
-            for (const saved of arr) {
-                const live = FRACTURES.find(f => f.id === saved.id);
-                if (live) {
-                    live.unlocked  = saved.unlocked  ?? live.unlocked;
-                    live.previewed = saved.previewed ?? live.previewed;
-                    live.completed = saved.completed ?? live.completed;
-                }
-            }
-        }
-    } catch (e) {}
-
-    try {
-        const ms = localStorage.getItem('smb_motivation_stage');
-        if (ms !== null) motivationStage = Math.min(3, parseInt(ms, 10) || 0);
-    } catch (e) {}
 }
 
 // Load saved state on script execution
@@ -567,30 +531,11 @@ function hasStoryFlag(key) {
 // ── Persistence ──────────────────────────────────────────────
 
 function _saveStoryProgress() {
-    if (typeof saveGame === 'function') { saveGame(); return; }
-    try {
-        localStorage.setItem('smb_story_progress', JSON.stringify({
-            act:     STORY_PROGRESS.act,
-            chapter: STORY_PROGRESS.chapter,
-            flags:   STORY_PROGRESS.flags
-        }));
-    } catch (e) {}
+    if (typeof saveGame === 'function') { saveGame(); }
 }
 
 (function _loadStoryProgress() {
     // Skip if account data was already applied (storyProgress handled in _loadProgressionState)
     const _acct = (window.GameState) ? GameState.getActiveAccount() : null;
     if (_acct && _acct.data && _acct.data.storyProgress) return;
-
-    // Fallback: legacy localStorage
-    try {
-        const raw = localStorage.getItem('smb_story_progress');
-        if (!raw) return;
-        const saved = JSON.parse(raw);
-        if (window.STORY_PROGRESS) {
-            if (typeof saved.act     === 'number') STORY_PROGRESS.act     = saved.act;
-            if (typeof saved.chapter === 'number') STORY_PROGRESS.chapter = saved.chapter;
-            if (saved.flags && typeof saved.flags === 'object') Object.assign(STORY_PROGRESS.flags, saved.flags);
-        }
-    } catch (e) { /* ignore corrupt data */ }
 })();

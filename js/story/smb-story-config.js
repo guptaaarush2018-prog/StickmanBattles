@@ -766,9 +766,6 @@ function _storyUpdateExpDisplay() {
   if (el) el.textContent = `${_story2.exp || 0} EXP`;
 }
 
-// ── Persistent state (separate key to avoid collision with v1) ───────────────
-const _STORY2_KEY = 'smc_story2';
-
 function _defaultStory2Progress() {
   return {
     chapter:           0,       // index into STORY_CHAPTERS2 (next to play)
@@ -857,13 +854,11 @@ function _pickInitialStory2(localStory, accountStory, accountTs) {
 
 let _story2 = (function() {
   try {
-    const raw = localStorage.getItem(_STORY2_KEY);
-    const localStory = raw ? JSON.parse(raw) : null;
     const canonical = (typeof _readCanonicalSave === 'function') ? _readCanonicalSave() : null;
     const acct = (window.GameState && typeof GameState.getActiveAccount === 'function') ? GameState.getActiveAccount() : null;
-    const accountStory = acct && acct.data && acct.data.story ? acct.data.story : null;
+    const accountStory = canonical && canonical.story ? canonical.story : (acct && acct.data && acct.data.story ? acct.data.story : null);
     const accountTs = acct && acct.data && acct.data.meta && typeof acct.data.meta.updatedAt === 'number' ? acct.data.meta.updatedAt : 0;
-    const chosen = _pickInitialStory2(localStory, canonical && canonical.story ? canonical.story : accountStory, accountTs);
+    const chosen = _pickInitialStory2(null, accountStory, accountTs);
     return chosen || _defaultStory2Progress();
   } catch(e) { return _defaultStory2Progress(); }
 })();
@@ -887,7 +882,6 @@ function _saveStory2() {
       ? window.__SMB_PENDING_SAVE_TIMESTAMP
       : Date.now();
     _story2.meta.source = 'local';
-    localStorage.setItem(_STORY2_KEY, JSON.stringify(_story2));
     if (window.__SMB_CAN_FLUSH_SAVE && typeof saveGame === 'function') {
       saveGame();
     }

@@ -32,9 +32,9 @@ function _readCanonicalSave() {
     if (!parsed) return null;
     if (parsed && parsed.accounts && parsed.activeAccountId) {
       const acct = parsed.accounts[parsed.activeAccountId];
-      return acct && acct.data ? acct.data : null;
+      return acct && acct.data ? _normalizeAccountSaveShape(acct.data) : null;
     }
-    return parsed;
+    return _normalizeAccountSaveShape(parsed);
   } catch(e) {
     console.warn('[SAVE] parse failed', e);
     return null;
@@ -75,13 +75,48 @@ function _extractActiveAccountSave(root) {
   return null;
 }
 
+function _normalizeAccountSaveShape(data) {
+  if (!data || typeof data !== 'object') return null;
+  const out = JSON.parse(JSON.stringify(data));
+  if (typeof out.version !== 'number') out.version = SAVE_VERSION;
+  if (!out.unlocks || typeof out.unlocks !== 'object') out.unlocks = {};
+  if (!Array.isArray(out.cosmetics)) {
+    out.cosmetics = Array.isArray(out.unlockedCosmetics) ? out.unlockedCosmetics.slice() : [];
+  }
+  if (typeof out.coins !== 'number') {
+    if (typeof out.playerCoins === 'number') out.coins = out.playerCoins;
+    else if (out.progression && typeof out.progression.coins === 'number') out.coins = out.progression.coins;
+    else if (out.story && typeof out.story.coins === 'number') out.coins = out.story.coins;
+    else out.coins = 0;
+  }
+  if (out.storyProgress && typeof out.storyProgress === 'object') {
+    if (!out.story || typeof out.story !== 'object') out.story = {};
+    if (typeof out.story.chapter !== 'number' && typeof out.storyProgress.chapter === 'number') out.story.chapter = out.storyProgress.chapter;
+    if (typeof out.story.act !== 'number' && typeof out.storyProgress.act === 'number') out.story.act = out.storyProgress.act;
+    if (!Array.isArray(out.story.defeated) && Array.isArray(out.storyProgress.defeated)) out.story.defeated = out.storyProgress.defeated.slice();
+    if (!out.story.meta && out.storyProgress.meta && typeof out.storyProgress.meta === 'object') out.story.meta = Object.assign({}, out.storyProgress.meta);
+  }
+  if (out.story && typeof out.story === 'object') {
+    if (!out.storyProgress || typeof out.storyProgress !== 'object') out.storyProgress = {};
+    if (typeof out.storyProgress.chapter !== 'number' && typeof out.story.chapter === 'number') out.storyProgress.chapter = out.story.chapter;
+    if (typeof out.storyProgress.act !== 'number' && typeof out.story.act === 'number') out.storyProgress.act = out.story.act;
+    if (!Array.isArray(out.storyProgress.defeated) && Array.isArray(out.story.defeated)) out.storyProgress.defeated = out.story.defeated.slice();
+    if (!out.storyProgress.flags || typeof out.storyProgress.flags !== 'object') out.storyProgress.flags = {};
+  }
+  if (!out.meta || typeof out.meta !== 'object') out.meta = {};
+  if (typeof out.meta.updatedAt !== 'number') out.meta.updatedAt = 0;
+  return out;
+}
+
 function _saveSnapshotSummary(data) {
-  const coins = data && typeof data.coins === 'number' ? data.coins : 0;
-  const story = data && data.story;
-  const chapter = (story && typeof story.chapter === 'number')
+  const d = _normalizeAccountSaveShape(data) || {};
+  const coins = typeof d.coins === 'number' ? d.coins : 0;
+  const story = d.story || {};
+  const storyProgress = d.storyProgress || {};
+  const chapter = (typeof story.chapter === 'number')
     ? story.chapter
-    : (data && data.storyProgress && typeof data.storyProgress.chapter === 'number'
-      ? data.storyProgress.chapter
+    : (typeof storyProgress.chapter === 'number'
+      ? storyProgress.chapter
       : 0);
   return { coins, chapter };
 }
@@ -92,16 +127,19 @@ function _logSaveState(prefix, data, suffix) {
 }
 
 function _canonicalSaveMeaningful(data) {
-  if (!data || typeof data !== 'object') return false;
-  if (data.story && Array.isArray(data.story.defeated) && data.story.defeated.length > 0) return true;
-  if (data.story && (data.story.storyComplete || (Array.isArray(data.story.blueprints) && data.story.blueprints.length > 0))) return true;
-  if (data.unlocks) {
-    if (data.unlocks.bossBeaten || data.unlocks.trueform || data.unlocks.megaknight || data.unlocks.sovereignBeaten || data.unlocks.storyOnline || data.unlocks.tfEndingSeen || data.unlocks.damnationScar) return true;
-    if (Array.isArray(data.unlocks.letters) && data.unlocks.letters.length > 0) return true;
-    if (Array.isArray(data.unlocks.achievements) && data.unlocks.achievements.length > 0) return true;
+  const d = _normalizeAccountSaveShape(data);
+  if (!d || typeof d !== 'object') return false;
+  if (d.story && Array.isArray(d.story.defeated) && d.story.defeated.length > 0) return true;
+  if (d.storyProgress && typeof d.storyProgress.chapter === 'number' && d.storyProgress.chapter > 0) return true;
+  if (d.story && typeof d.story.chapter === 'number' && d.story.chapter > 0) return true;
+  if (d.story && (d.story.storyComplete || (Array.isArray(d.story.blueprints) && d.story.blueprints.length > 0))) return true;
+  if (d.unlocks) {
+    if (d.unlocks.bossBeaten || d.unlocks.trueform || d.unlocks.megaknight || d.unlocks.sovereignBeaten || d.unlocks.storyOnline || d.unlocks.tfEndingSeen || d.unlocks.damnationScar) return true;
+    if (Array.isArray(d.unlocks.letters) && d.unlocks.letters.length > 0) return true;
+    if (Array.isArray(d.unlocks.achievements) && d.unlocks.achievements.length > 0) return true;
   }
-  if (typeof data.coins === 'number' && data.coins > 0) return true;
-  if (Array.isArray(data.cosmetics) && data.cosmetics.length > 0) return true;
+  if (typeof d.coins === 'number' && d.coins > 0) return true;
+  if (Array.isArray(d.cosmetics) && d.cosmetics.length > 0) return true;
   return false;
 }
 
@@ -521,7 +559,7 @@ function addLetter(id) {
 // ── Legacy key cleanup ────────────────────────────────────────────────────────
 const _LEGACY_ACCOUNT_KEYS = [
   'smc_sovereignBeaten', 'smc_storyOnline', 'smc_storyDodgeUnlocked',
-  'smc_paradox_companion', 'smb_coins', 'smb_unlocked_cosmetics',
+  'smc_paradox_companion',
   'smc_tfEndingSeen', 'smb_damnationScar', 'smc_interTravel', 'smc_patrolMode',
   'smc_bossBeaten', 'smc_trueform', 'smc_letters', 'smc_megaknight',
   'smc_achievements',
@@ -578,24 +616,26 @@ function saveGame() {
     const acct = GameState.getActiveAccount();
     if (!acct) return;
     const data = _gatherSaveData();
+    const normalized = _normalizeAccountSaveShape(data) || data;
     const preserveTs = (window.__SMB_PENDING_SAVE_TIMESTAMP !== undefined);
-    data.meta = {
+    normalized.meta = {
       updatedAt: preserveTs
         ? Number(window.__SMB_PENDING_SAVE_TIMESTAMP) || 0
         : Date.now(),
       source: 'local',
     };
     // Preserve the _legacyCleared flag so cleanup is not undone on next load
-    if (acct.data && acct.data._legacyCleared) data._legacyCleared = true;
+    if (acct.data && acct.data._legacyCleared) normalized._legacyCleared = true;
     GameState.update(function(s) {
       const a = s.persistent.accounts[s.persistent.activeAccountId];
-      if (a) a.data = data;
+      if (a) a.data = normalized;
     });
     GameState.save();
-    _writeCanonicalSave(data);
-    _logSaveState('SAVE KEY', data, 'written');
+    _writeCanonicalSave(normalized);
+    _logSaveState('SAVE KEY', normalized, 'written');
+    console.info('[SAVE VERIFIED]', _saveSnapshotSummary(normalized));
     if (!window.__SMB_SUPPRESS_CLOUD_SYNC && window.SupabaseBridge && typeof SupabaseBridge.queueSyncFromRuntime === 'function') {
-      SupabaseBridge.queueSyncFromRuntime(data);
+      SupabaseBridge.queueSyncFromRuntime(normalized);
     }
   } catch(e) {
     console.warn('[SMC Save] Save failed:', e);
@@ -611,16 +651,17 @@ function loadGame() {
       : _readCanonicalStateRoot();
     const activeId = root && root.activeAccountId ? root.activeAccountId : (acct ? acct.id : null);
     const activeBlob = root && root.accounts && activeId && root.accounts[activeId] ? root.accounts[activeId].data : null;
-    const directBlob = (root && typeof root.version === 'number') ? root : null;
-    const canonical = activeBlob || directBlob;
+    const canonical = _normalizeAccountSaveShape(activeBlob || (root && typeof root.version === 'number' ? root : null));
     console.info(`[LOAD RAW PATH] active=${activeId || 'none'}`, {
       hasAccount: !!activeBlob,
-      path: activeBlob ? `smb_state.accounts.${activeId}.data` : (directBlob ? 'smb_state' : 'missing'),
+      path: activeBlob ? `smb_state.accounts.${activeId}.data` : (root && typeof root.version === 'number' ? 'smb_state' : 'missing'),
     });
+    console.info('[LOAD FULL OBJECT]', JSON.parse(JSON.stringify(activeBlob || {})));
     if (canonical && _canonicalSaveMeaningful(canonical)) {
       const summary = _saveSnapshotSummary(canonical);
       console.info(`[LOAD FOUND] coins=${summary.coins} chapter=${summary.chapter}`);
       _logSaveState('LOAD KEY', canonical, 'loaded');
+      console.info('[LOAD VERIFIED]', summary);
       _applySaveData(canonical);
       _refreshRuntimeFromSave(canonical);
       if (acct && acct.data !== canonical) {
@@ -650,6 +691,7 @@ function loadGame() {
       _refreshRuntimeFromSave(data);
       _writeCanonicalSave(data);
       _logSaveState('LOAD KEY', data, 'loaded');
+      console.info('[LOAD VERIFIED]', _saveSnapshotSummary(data));
       _queueCloudReconcile();
       return;
     }
@@ -663,7 +705,7 @@ function loadGame() {
     // Clear all account-scoped localStorage caches so the new account starts clean.
     // No-ops on initial page load; only meaningful during in-session account switches.
     try {
-      ['smc_story2','smc_sovereignBeaten','smc_storyOnline','smc_tfEndingSeen',
+      ['smc_sovereignBeaten','smc_storyOnline','smc_tfEndingSeen',
        'smb_damnationScar','smc_storyDodgeUnlocked','smc_paradox_companion']
         .forEach(function(k) { localStorage.removeItem(k); });
     } catch(e) {}

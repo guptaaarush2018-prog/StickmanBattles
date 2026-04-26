@@ -222,7 +222,7 @@ const COSMETIC_CATALOG = [
 ];
 
 // ---- Coin balance ----
-let coinBalance = parseInt(localStorage.getItem('smb_coins') || '0', 10);
+let coinBalance = (typeof playerCoins !== 'undefined') ? playerCoins : 0;
 
 function _syncCoinDisplay() {
   const storeBal = document.getElementById('storeCoinBalance');
@@ -247,8 +247,6 @@ function setCoinBalance(value) {
   }
   if (typeof saveGame === 'function') {
     saveGame();
-  } else {
-    localStorage.setItem('smb_coins', String(coinBalance));
   }
   _syncCoinDisplay();
   return coinBalance;
@@ -262,8 +260,7 @@ function awardCoins(n) {
 let _unlockedSet = null;
 function _getUnlocked() {
   if (!_unlockedSet) {
-    try { _unlockedSet = new Set(JSON.parse(localStorage.getItem('smb_unlocked_cosmetics') || '[]')); }
-    catch(e) { _unlockedSet = new Set(); }
+    _unlockedSet = new Set(Array.isArray(unlockedCosmetics) ? unlockedCosmetics : []);
   }
   return _unlockedSet;
 }
@@ -281,8 +278,6 @@ function unlockCosmetic(id) {
   _getUnlocked().add(id);
   if (typeof saveGame === 'function') {
     saveGame();
-  } else {
-    localStorage.setItem('smb_unlocked_cosmetics', JSON.stringify([..._getUnlocked()]));
   }
   return true;
 }
