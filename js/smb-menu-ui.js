@@ -245,11 +245,14 @@ function getCoinBalance() {
 
 function setCoinBalance(value) {
   const next = Math.max(0, Math.floor(Number(value) || 0));
+  coinBalance = next;
   if (typeof updateCoins === 'function') {
     updateCoins(function() { return next; });
-    coinBalance = next;
-  } else {
-    coinBalance = next;
+  } else if (typeof playerCoins !== 'undefined') {
+    playerCoins = next;
+    if (typeof saveGame === 'function') {
+      saveGame();
+    }
   }
   _syncCoinDisplay();
   return coinBalance;
@@ -276,6 +279,9 @@ function unlockCosmetic(id) {
   setCoinBalance(coinBalance - entry.price);
   if (typeof addCosmetic === 'function') {
     addCosmetic(id);
+  } else if (typeof unlockedCosmetics !== 'undefined' && unlockedCosmetics.indexOf(id) === -1) {
+    unlockedCosmetics.push(id);
+    if (typeof saveGame === 'function') saveGame();
   }
   return true;
 }
@@ -412,4 +418,3 @@ const _CLASS_CARD_DATA = {
   paladin:   { icon: '🛡️', tag: 'Holy' },
   berserker: { icon: '💢', tag: 'Frenzy' },
 };
-

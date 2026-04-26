@@ -20,7 +20,7 @@ function _parseMaybeEncodedSave(raw) {
     const decoded = JSON.parse(decodeURIComponent(escape(atob(raw))));
     if (decoded && typeof decoded === 'object') return decoded;
   } catch(e) {}
-  console.warn('[save] save parse failed', { key: CANONICAL_SAVE_KEY });
+  console.warn('[SAVE] parse failed', { key: CANONICAL_SAVE_KEY });
   return null;
 }
 
@@ -28,7 +28,7 @@ function _readCanonicalSave() {
   try {
     return _parseMaybeEncodedSave(localStorage.getItem(CANONICAL_SAVE_KEY));
   } catch(e) {
-    console.warn('[save] save parse failed: canonical save', e);
+    console.warn('[SAVE] parse failed', e);
     return null;
   }
 }
@@ -36,15 +36,25 @@ function _readCanonicalSave() {
 function _writeCanonicalSave(data) {
   try {
     localStorage.setItem(CANONICAL_SAVE_KEY, JSON.stringify(data));
-    const storyCount = data && data.story && Array.isArray(data.story.defeated) ? data.story.defeated.length : 0;
-    console.info('[save] save written', {
-      key: CANONICAL_SAVE_KEY,
-      updatedAt: data && data.meta ? data.meta.updatedAt : null,
-      storyBeaten: storyCount,
-    });
   } catch(e) {
     console.warn('[save] save write failed: canonical save', e);
   }
+}
+
+function _saveSnapshotSummary(data) {
+  const coins = data && typeof data.coins === 'number' ? data.coins : 0;
+  const story = data && data.story;
+  const chapter = (story && typeof story.chapter === 'number')
+    ? story.chapter
+    : (data && data.storyProgress && typeof data.storyProgress.chapter === 'number'
+      ? data.storyProgress.chapter
+      : 0);
+  return { coins, chapter };
+}
+
+function _logSaveState(prefix, data, suffix) {
+  const s = _saveSnapshotSummary(data);
+  console.info(`[${prefix}] coins=${s.coins} chapter=${s.chapter} ${suffix}`);
 }
 
 function _canonicalSaveMeaningful(data) {
@@ -417,7 +427,11 @@ function setAccountFlag(path, value, acctOverride) {
     ref = ref[path[i]];
   }
   ref[path[path.length - 1]] = value;
-  queueGameStateSave();
+  if (typeof saveGame === 'function') {
+    saveGame();
+  } else {
+    queueGameStateSave();
+  }
 }
 
 function setAccountFlagWithRuntime(path, value, runtimeSetter) {
@@ -545,6 +559,7 @@ function saveGame() {
     });
     GameState.save();
     _writeCanonicalSave(data);
+    _logSaveState('SAVE', data, 'written');
     if (!window.__SMB_SUPPRESS_CLOUD_SYNC && window.SupabaseBridge && typeof SupabaseBridge.queueSyncFromRuntime === 'function') {
       SupabaseBridge.queueSyncFromRuntime(data);
     }
@@ -559,7 +574,7 @@ function loadGame() {
     const acct = window.GameState ? GameState.getActiveAccount() : null;
     const canonical = _readCanonicalSave();
     if (canonical && _canonicalSaveMeaningful(canonical)) {
-      console.info('[save] save loaded', { key: CANONICAL_SAVE_KEY, updatedAt: canonical.meta && canonical.meta.updatedAt ? canonical.meta.updatedAt : null });
+      _logSaveState('LOAD', canonical, 'loaded');
       _applySaveData(canonical);
       _refreshRuntimeFromSave(canonical);
       if (acct && acct.data !== canonical) {
@@ -588,10 +603,7 @@ function loadGame() {
       _applySaveData(data);
       _refreshRuntimeFromSave(data);
       _writeCanonicalSave(data);
-      console.info('[save] save loaded', {
-        key: 'smb_state',
-        updatedAt: data.meta && data.meta.updatedAt ? data.meta.updatedAt : null,
-      });
+      _logSaveState('LOAD', data, 'loaded');
       _queueCloudReconcile();
       return;
     }
@@ -607,10 +619,7 @@ function loadGame() {
           _applySaveData(data);
           _refreshRuntimeFromSave(data);
           _writeCanonicalSave(data);
-          console.info('[save] save loaded', {
-            key: legacyKey,
-            updatedAt: data.meta && data.meta.updatedAt ? data.meta.updatedAt : null,
-          });
+          _logSaveState('LOAD', data, 'loaded');
           // One-time migration: write into GameState so future loads use the new path
           window.__SMB_SUPPRESS_CLOUD_SYNC = true;
           window.__SMB_PENDING_SAVE_TIMESTAMP = 0;
@@ -623,8 +632,8 @@ function loadGame() {
           _queueCloudReconcile();
           return;
         }
-      } catch(e) {
-        console.warn('[SMC Save] Legacy key decode failed:', e);
+    } catch(e) {
+        console.warn('[SAVE] parse failed', e);
       }
     }
 
@@ -641,7 +650,7 @@ function loadGame() {
        'smb_damnationScar','smc_storyDodgeUnlocked','smc_paradox_companion']
         .forEach(function(k) { localStorage.removeItem(k); });
     } catch(e) {}
-    console.info('[save] defaults used', { key: CANONICAL_SAVE_KEY });
+    _logSaveState('LOAD', { coins: 0, storyProgress: { chapter: 0 } }, 'defaults used');
     if (typeof restoreStoryDataFromSave === 'function' &&
         typeof _defaultStory2Progress === 'function') {
       restoreStoryDataFromSave(_defaultStory2Progress());

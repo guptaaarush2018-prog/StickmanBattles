@@ -242,7 +242,14 @@ function getCoinBalance() {
 function setCoinBalance(value) {
   const next = Math.max(0, Math.floor(Number(value) || 0));
   coinBalance = next;
-  localStorage.setItem('smb_coins', String(coinBalance));
+  if (typeof playerCoins !== 'undefined') {
+    playerCoins = next;
+  }
+  if (typeof saveGame === 'function') {
+    saveGame();
+  } else {
+    localStorage.setItem('smb_coins', String(coinBalance));
+  }
   _syncCoinDisplay();
   return coinBalance;
 }
@@ -272,7 +279,11 @@ function unlockCosmetic(id) {
   if (coinBalance < entry.price) return false;
   setCoinBalance(coinBalance - entry.price);
   _getUnlocked().add(id);
-  localStorage.setItem('smb_unlocked_cosmetics', JSON.stringify([..._getUnlocked()]));
+  if (typeof saveGame === 'function') {
+    saveGame();
+  } else {
+    localStorage.setItem('smb_unlocked_cosmetics', JSON.stringify([..._getUnlocked()]));
+  }
   return true;
 }
 
