@@ -341,13 +341,25 @@ function togglePerformanceMode() {
 
 // ── Changelog ─────────────────────────────────────────────────────────────────
 const _CLG_CAT_COLORS = {
-  Story:     '#88ccff',
-  Cinematic: '#cc88ff',
-  AI:        '#ff9966',
-  Combat:    '#ff6688',
-  UI:        '#88ffcc',
-  Network:   '#ffcc66',
-  System:    '#aaaacc',
+  Story:       '#88ccff',
+  Cinematic:   '#cc88ff',
+  AI:          '#ff9966',
+  Combat:      '#ff6688',
+  UI:          '#88ffcc',
+  Network:     '#ffcc66',
+  System:      '#aaaacc',
+  Mode:        '#ffdd88',
+  Entity:      '#ffffff',
+  Account:     '#66ccff',
+  Debug:       '#88ff99',
+  Achievement: '#ffcc00',
+  Polish:      '#bb88ff',
+  Balance:     '#ff8866',
+  Economy:     '#ffaa44',
+  Narrative:   '#cc88ff',
+  Mechanic:    '#ff6688',
+  Music:       '#88ffdd',
+  Fix:         '#66ff99',
 };
 
 // Returns true if this change item should currently be shown glitched/hidden.
