@@ -45,11 +45,27 @@ const SERVER_CONFIG = {
 // ============================================================
 const CHANGELOG = [
   {
+    version: '2.9.0',
+    title: 'THE CLOUD UPDATE',
+    date: '2026-04-26',
+    flavor: 'Your progress follows you now. Sign in once. Fight anywhere. The game remembers everything.',
+    isLatest: true,
+    changes: [
+      { cat: 'System',  text: 'Added cloud save system — create a free account and your progress syncs automatically across devices; unlocks, story chapters, cosmetics, and fracture state are all preserved' },
+      { cat: 'System',  text: 'Save reconciliation on login merges local and cloud data non-destructively — unlocks, letters, achievements, and blueprints take the union; numeric stats keep the highest value; no progress is ever overwritten on sign-in' },
+      { cat: 'System',  text: 'Added "Save Your Progress" prompt — appears after completing Chapter 1 if not signed into a cloud account; one-time nudge with direct sign-up flow' },
+      { cat: 'UI',      text: 'Added home quick-nav bar — Account & Saves, Store, Settings, and Community buttons always visible on the main menu without scrolling' },
+      { cat: 'UI',      text: 'Settings rebuilt as a full modal overlay — organized into Graphics, Audio, Account & Data, Advanced, and Reset sections; replaces the old inline panel toggle' },
+      { cat: 'UI',      text: 'Added Community modal — Discord link and community info accessible from the nav bar and footer' },
+      { cat: 'UI',      text: 'Footer condensed — Achievements, Updates, and Community pills replace the old scattered footer buttons' },
+    ],
+  },
+  {
     version: '2.8.0',
     title: 'THE LOOP UPDATE',
     date: '2026-04-15',
     flavor: 'Before you can reach True Form, it reaches you first. Escape the loop. Uncover what started it all. And take your shape.',
-    isLatest: true,
+    isLatest: false,
     changes: [
       { cat: 'Story',   text: 'Added Eternal Damnation arc (Act 5, Ch. 91–92) — True Form sends an echo of itself inward before the player arrives; the dimension wall seals, trapping the player in a dying loop with 17 fractured echoes of past enemies', spoilerAct: 5 },
       { cat: 'Story',   text: 'Added Damnation arena — a crumbling loop-dimension stage exclusive to the Eternal Damnation gauntlet; platforms are removed in sequence as the escape window closes', spoilerAct: 5 },
@@ -473,7 +489,7 @@ let _publicRoomCheckTimer = 0;
 // ============================================================
 // VERSION
 // ============================================================
-const GAME_VERSION = '2.8.0';  // bump this when releasing; must match CHANGELOG[0].version
+const GAME_VERSION = '2.9.0';  // bump this when releasing; must match CHANGELOG[0].version
 
 // DEBUG / DEVELOPER STATE
 // ============================================================

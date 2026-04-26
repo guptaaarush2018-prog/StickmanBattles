@@ -56,7 +56,7 @@ Before making any change:
 1. **Read the relevant module** — understand what already exists
 2. **Read the relevant docs file** — understand the system's design contract
 3. **Plan the smallest possible patch** — do not touch unrelated code
-4. **Verify syntax:** `node --check Stickman-Battles/js/smb-yourfile.js`
+4. **Verify syntax:** `node --check js/smb-yourfile.js`
 5. **Do not add features or refactoring** beyond what was asked
 
 When in doubt: read more code, ask before assuming.
@@ -97,7 +97,7 @@ cd "Stickman-Battles" && python3 -m http.server 8080
 # Open: http://localhost:8080/index.html
 
 # Syntax-check a JS file
-node --check Stickman-Battles/js/smb-globals.js
+node --check js/smb-globals.js
 ```
 
 ### Server details (`server.js` + `storage.js`)
@@ -157,76 +157,77 @@ Script load order in `Stickman-Battles/index.html` — files may only reference 
 33. `js/smb-enemies-creatures.js` — `Yeti`, `Dummy` classes
 34. `js/smb-enemies-training.js` — Training mode, map creator, custom weapon creator
 35. `js/smb-enemies-class.js` — `applyClass`, `updateClassWeapon`, `showDesc`, mirror AI patch
-36. `js/boss/smb-boss.js` — Boss class (3-phase)
-37. `js/boss/smb-boss-cinematics.js` — Boss cinematic sequences
-38. `js/boss/smb-boss-tf-misc.js` — TF black holes, warp, portal teleport, size manipulation
-39. `js/boss/smb-boss-phase-cin.js` — Phase 2/3 cinematics for Boss, TrueForm, Beast, Yeti
-40. `js/boss/smb-boss-tf-legacy.js` — DELETED cinematic stubs + `triggerPhaseTransition`
-41. `js/boss/smb-boss-tf-attacks1.js` — Gravity wells, meteor crash, clones, dimension punch, shockwaves, boss pending attacks
-42. `js/boss/smb-boss-tf-attacks2.js` — `updateTFPendingAttacks`, `drawBossWarnings`, `resetBossWarnings`
-43. `js/boss/smb-boss-tf-visuals1.js` — Phase shift, reality tear, calc strike, math bubble, reality override, gamma beam
-44. `js/boss/smb-boss-tf-visuals2.js` — Burn trail, neutron star, galaxy sweep, multiverse fracture, supernova
-45. `js/boss/smb-boss-helpers.js` — Boss utility functions
-46. `js/boss/smb-trueform.js` — TrueForm class
-47. `js/boss/smb-trueform-attacks.js` — TrueForm move set
-48. `js/smb-paradox-class.js` — Paradox entity class + global state
-49. `js/smb-paradox-opening.js` — TF opening fight cinematic
-50. `js/smb-paradox-return-cin.js` — TF kicks Paradox out + return-1000 cinematic
-51. `js/smb-paradox-absorption-update.js` — Absorption update logic
-52. `js/smb-paradox-absorption-draw.js` — Absorption draw, memories, KC overlay
-53. `js/smb-paradox-kills-cin.js` — `_makeTFKillsParadoxCinematic`
-54. `js/smb-paradox-revive.js` — Spawn/remove, revive, damage lock, empowerment, foreshadow
-55. `js/smb-paradox-intro-cin.js` — `_makeTFIntroCinematic`
-56. `js/smb-paradox-cin2.js` — `_makeTFParadoxEntryCinematic`, `_makeTFFinalParadoxCinematic`, false victory
-57. `js/smb-paradox-effects.js` — `resetParadoxState`, `updateParadoxEffects`
-58. `js/smb-paradox-ai.js` — `drawParadoxEffects`, fusion AI, ability handlers, companion
-59. `js/smb-behavior-model.js` — Player behavior fingerprinting; plugs into AdaptiveAI
-60. `js/smb-adaptive-ai.js` — Real-time player profiling / adaptive AI
-61. `js/smb-smk2-data.js` — SovereignMK2 dialogue pools, action classifier, stage names
-62. `js/smb-smk2-class.js` — `SovereignMK2 extends AdaptiveAI` + debug API
-63. `js/smb-trueform-ending-data.js` — TFEnding state vars, helpers, `startTFEnding`
-64. `js/smb-trueform-ending-update.js` — `updateTFEnding` state machine
-65. `js/smb-trueform-ending-draw.js` — `drawTFEnding`, utilities
-66. `js/rendering/smb-drawing-arenas.js` — Arena backgrounds and platform drawing
-67. `js/rendering/smb-drawing-bg.js` — `generateBgElements`, `drawBackground`, explore tiles
-68. `js/rendering/smb-drawing-effects.js` — Boss beams, class effects, accessories, lightning
-69. `js/rendering/smb-drawing-scenes.js` — Boss death scene, fake death scene
-70. `js/rendering/smb-drawing-hud.js` — Story subtitle, objective HUD, cinematic letterbox
-71. `js/rendering/smb-drawing-arenas2.js` — Cave, mirror, underwater, volcano, cyberpunk, etc.
-72. `js/rendering/smb-drawing-arenas3.js` — Online/large arenas + home world arenas
-73. `js/smb-minigames.js` — Survival, KotH, Chaos Match systems
-74. `js/smb-qte-core.js` — QTE phase defs, state, public API, trigger detection, `_startQTE`
-75. `js/smb-qte-engine.js` — QTE stage tickers, prompt logic, round failure, `_endQTE`
-76. `js/smb-qte-draw.js` — QTE draw functions (background, prompts, HUD, combo text)
-77. `js/smb-cinematic.js` — Cinematic playback runtime
-78. `js/smb-cutscene.js` — Cutscene helpers
-79. `js/smb-camera.js` — Camera sequences, drama cam, `updateCamera`
-80. `js/smb-loop-core.js` — `applyWorldModifiers` + main `gameLoop` (monolithic)
-81. `js/smb-input.js` — `processInput`, shield constants, key normalization
-82. `js/smb-cheats.js` — `applyCode`, all cheat code logic
-83. `js/smb-menu-ui.js` — Mode selection, cosmetics/store, bot toggle
-84. `js/smb-menu-select.js` — Card grids, arena/lives/settings selection, changelog
-85. `js/smb-menu-config.js` — Custom weapons panel, stats log, weapon/class resolution
-86. `js/smb-menu-spawn.js` — `startGame`, arena spawn bounds, safe spawn helpers
-87. `js/smb-menu-startcore.js` — `_startGameCore` (full game initialisation sequence)
-88. `js/smb-menu-utils.js` — `toggleChaosMode`, `resizeGame`, `refreshMenuFromAccount`, `drawEdgeIndicators`
-89. `js/smb-network.js` — NetworkManager (PeerJS/WebRTC)
-90. `js/smb-state.js` — `GameState`: centralized persistent state (accounts, admin overrides, session metadata)
-91. `js/smb-online.js` — `LobbyManager`: lobby presence layer on top of NetworkManager; localStorage lobby ads
-92. `js/smb-debug-overlay.js` — Debug HUD, sanity checks, debug menu panel
-93. `js/smb-debug-console.js` — In-game developer console (`_consoleExec`)
-94. `js/smb-debug-jump.js` — F8 developer jump menu (story/cinematic/arena/boss fast-travel)
-95. `js/smb-accounts.js` — `AccountManager`: local multi-account system; reads/writes via `GameState`
-96. `js/smb-save.js` — Save/load persistence
-97. `js/smb-admin-core.js` — Admin identity, isAdmin, ban/unban/kick actions, player management
-98. `js/smb-admin-panels.js` — Admin panel DOM, action handlers, toast, ban screen, F9 listener
-99. `js/smb-attacktest-core.js` — ATK sandbox state, proxy factory, helpers
-100. `js/smb-attacktest-exec.js` — `FORCE_ATTACK_MODE`, `forceExecuteAttack`, debug tools
-101. `js/smb-attacktest-registry.js` — `ATK_REGISTRY` per-class attack definitions
-102. `js/smb-attacktest-commands.js` — `_atkCommand` router, kit HUD, key handler
-103. `js/smb-attacktest-gui.js` — Visual GUI overlay + console patch
-104. `js/story/smb-story-registry.js` — Story chapter registry
-105. `js/story/acts/` — Per-act story arc files:
+36. `js/smb-god.js` — God entity, encounter system, fake crash screen, Godslayer weapon
+37. `js/boss/smb-boss.js` — Boss class (3-phase)
+38. `js/boss/smb-boss-cinematics.js` — Boss cinematic sequences
+39. `js/boss/smb-boss-tf-misc.js` — TF black holes, warp, portal teleport, size manipulation
+40. `js/boss/smb-boss-phase-cin.js` — Phase 2/3 cinematics for Boss, TrueForm, Beast, Yeti
+41. `js/boss/smb-boss-tf-legacy.js` — DELETED cinematic stubs + `triggerPhaseTransition`
+42. `js/boss/smb-boss-tf-attacks1.js` — Gravity wells, meteor crash, clones, dimension punch, shockwaves, boss pending attacks
+43. `js/boss/smb-boss-tf-attacks2.js` — `updateTFPendingAttacks`, `drawBossWarnings`, `resetBossWarnings`
+44. `js/boss/smb-boss-tf-visuals1.js` — Phase shift, reality tear, calc strike, math bubble, reality override, gamma beam
+45. `js/boss/smb-boss-tf-visuals2.js` — Burn trail, neutron star, galaxy sweep, multiverse fracture, supernova
+46. `js/boss/smb-boss-helpers.js` — Boss utility functions
+47. `js/boss/smb-trueform.js` — TrueForm class
+48. `js/boss/smb-trueform-attacks.js` — TrueForm move set
+49. `js/smb-paradox-class.js` — Paradox entity class + global state
+50. `js/smb-paradox-opening.js` — TF opening fight cinematic
+51. `js/smb-paradox-return-cin.js` — TF kicks Paradox out + return-1000 cinematic
+52. `js/smb-paradox-absorption-update.js` — Absorption update logic
+53. `js/smb-paradox-absorption-draw.js` — Absorption draw, memories, KC overlay
+54. `js/smb-paradox-kills-cin.js` — `_makeTFKillsParadoxCinematic`
+55. `js/smb-paradox-revive.js` — Spawn/remove, revive, damage lock, empowerment, foreshadow
+56. `js/smb-paradox-intro-cin.js` — `_makeTFIntroCinematic`
+57. `js/smb-paradox-cin2.js` — `_makeTFParadoxEntryCinematic`, `_makeTFFinalParadoxCinematic`, false victory
+58. `js/smb-paradox-effects.js` — `resetParadoxState`, `updateParadoxEffects`
+59. `js/smb-paradox-ai.js` — `drawParadoxEffects`, fusion AI, ability handlers, companion
+60. `js/smb-behavior-model.js` — Player behavior fingerprinting; plugs into AdaptiveAI
+61. `js/smb-adaptive-ai.js` — Real-time player profiling / adaptive AI
+62. `js/smb-smk2-data.js` — SovereignMK2 dialogue pools, action classifier, stage names
+63. `js/smb-smk2-class.js` — `SovereignMK2 extends AdaptiveAI` + debug API
+64. `js/smb-trueform-ending-data.js` — TFEnding state vars, helpers, `startTFEnding`
+65. `js/smb-trueform-ending-update.js` — `updateTFEnding` state machine
+66. `js/smb-trueform-ending-draw.js` — `drawTFEnding`, utilities
+67. `js/rendering/smb-drawing-arenas.js` — Arena backgrounds and platform drawing
+68. `js/rendering/smb-drawing-bg.js` — `generateBgElements`, `drawBackground`, explore tiles
+69. `js/rendering/smb-drawing-effects.js` — Boss beams, class effects, accessories, lightning
+70. `js/rendering/smb-drawing-scenes.js` — Boss death scene, fake death scene
+71. `js/rendering/smb-drawing-hud.js` — Story subtitle, objective HUD, cinematic letterbox
+72. `js/rendering/smb-drawing-arenas2.js` — Cave, mirror, underwater, volcano, cyberpunk, etc.
+73. `js/rendering/smb-drawing-arenas3.js` — Online/large arenas + home world arenas
+74. `js/smb-minigames.js` — Survival, KotH, Chaos Match systems
+75. `js/smb-qte-core.js` — QTE phase defs, state, public API, trigger detection, `_startQTE`
+76. `js/smb-qte-engine.js` — QTE stage tickers, prompt logic, round failure, `_endQTE`
+77. `js/smb-qte-draw.js` — QTE draw functions (background, prompts, HUD, combo text)
+78. `js/smb-cinematic.js` — Cinematic playback runtime
+79. `js/smb-cutscene.js` — Cutscene helpers
+80. `js/smb-camera.js` — Camera sequences, drama cam, `updateCamera`
+81. `js/smb-loop-core.js` — `applyWorldModifiers` + main `gameLoop` (monolithic)
+82. `js/smb-input.js` — `processInput`, shield constants, key normalization
+83. `js/smb-cheats.js` — `applyCode`, all cheat code logic
+84. `js/smb-menu-ui.js` — Mode selection, cosmetics/store, bot toggle
+85. `js/smb-menu-select.js` — Card grids, arena/lives/settings selection, changelog
+86. `js/smb-menu-config.js` — Custom weapons panel, stats log, weapon/class resolution
+87. `js/smb-menu-spawn.js` — `startGame`, arena spawn bounds, safe spawn helpers
+88. `js/smb-menu-startcore.js` — `_startGameCore` (full game initialisation sequence)
+89. `js/smb-menu-utils.js` — `toggleChaosMode`, `resizeGame`, `refreshMenuFromAccount`, `drawEdgeIndicators`
+90. `js/smb-network.js` — NetworkManager (PeerJS/WebRTC)
+91. `js/smb-state.js` — `GameState`: centralized persistent state (accounts, admin overrides, session metadata)
+92. `js/smb-online.js` — `LobbyManager`: lobby presence layer on top of NetworkManager; localStorage lobby ads
+93. `js/smb-debug-overlay.js` — Debug HUD, sanity checks, debug menu panel
+94. `js/smb-debug-console.js` — In-game developer console (`_consoleExec`)
+95. `js/smb-debug-jump.js` — F8 developer jump menu (story/cinematic/arena/boss fast-travel)
+96. `js/smb-accounts.js` — `AccountManager`: local multi-account system; reads/writes via `GameState`
+97. `js/smb-save.js` — Save/load persistence
+98. `js/smb-admin-core.js` — Admin identity, isAdmin, ban/unban/kick actions, player management
+99. `js/smb-admin-panels.js` — Admin panel DOM, action handlers, toast, ban screen, F9 listener
+100. `js/smb-attacktest-core.js` — ATK sandbox state, proxy factory, helpers
+101. `js/smb-attacktest-exec.js` — `FORCE_ATTACK_MODE`, `forceExecuteAttack`, debug tools
+102. `js/smb-attacktest-registry.js` — `ATK_REGISTRY` per-class attack definitions
+103. `js/smb-attacktest-commands.js` — `_atkCommand` router, kit HUD, key handler
+104. `js/smb-attacktest-gui.js` — Visual GUI overlay + console patch
+105. `js/story/smb-story-registry.js` — Story chapter registry
+106. `js/story/acts/` — Per-act story arc files:
     - act0: arc1, arc2
     - act1: arc1, arc2
     - act2: arc1, arc2, arc3
@@ -236,21 +237,21 @@ Script load order in `Stickman-Battles/index.html` — files may only reference 
     - act5: arc1, arc2, arc-damnation
     - act6: arc1, arc2
     - side: smb-lab-infiltration
-106. `js/story/smb-story-config.js` — Story configuration
-107. `js/story/smb-story-engine-data.js` — Chapter expansion helpers, state vars
-108. `js/story/smb-story-engine-ui.js` — Tab switching, journey/store/skill-tree UI
-109. `js/story/smb-story-engine-flow.js` — Chapter launch flow
-110. `js/story/smb-story-engine-match.js` — `spawnWorldBoss`, `story2OnMatchEnd`, victory
-111. `js/story/smb-story-engine-events.js` — Event bus, `_handleBuiltinEvent`, freeze/slow helpers
-112. `js/story/smb-story-engine-frame.js` — Per-frame: `storyCheckEvents`, dodge roll, boundaries
-113. `js/story/smb-story-engine-explore.js` — Exploration chapter: platform gen, side portal
-114. `js/story/smb-story-engine-explore2.js` — `updateExploration`, scene triggers, fallen warrior
-115. `js/story/smb-story-finalize.js` — Story end/transition logic
-116. `js/smb-progression.js` — Player progression / unlocks
-117. `js/smb-multiverse.js` — Multiverse mode
-118. `js/smb-multiplayer-chaos.js` — Multiplayer chaos extensions
-119. `js/smb-designer.js` — Level designer tool
-120. `js/smb-test-tools.js` — Test/QA tooling (loaded last)
+107. `js/story/smb-story-config.js` — Story configuration
+108. `js/story/smb-story-engine-data.js` — Chapter expansion helpers, state vars
+109. `js/story/smb-story-engine-ui.js` — Tab switching, journey/store/skill-tree UI
+110. `js/story/smb-story-engine-flow.js` — Chapter launch flow
+111. `js/story/smb-story-engine-match.js` — `spawnWorldBoss`, `story2OnMatchEnd`, victory
+112. `js/story/smb-story-engine-events.js` — Event bus, `_handleBuiltinEvent`, freeze/slow helpers
+113. `js/story/smb-story-engine-frame.js` — Per-frame: `storyCheckEvents`, dodge roll, boundaries
+114. `js/story/smb-story-engine-explore.js` — Exploration chapter: platform gen, side portal
+115. `js/story/smb-story-engine-explore2.js` — `updateExploration`, scene triggers, fallen warrior
+116. `js/story/smb-story-finalize.js` — Story end/transition logic
+117. `js/smb-progression.js` — Player progression / unlocks
+118. `js/smb-multiverse.js` — Multiverse mode
+119. `js/smb-multiplayer-chaos.js` — Multiplayer chaos extensions
+120. `js/smb-designer.js` — Level designer tool
+121. `js/smb-test-tools.js` — Test/QA tooling (loaded last)
 
 Dependencies: GSAP 3.12.5 (CDN), PeerJS 1.5.4 (CDN).
 
@@ -268,6 +269,7 @@ Dependencies: GSAP 3.12.5 (CDN), PeerJS 1.5.4 (CDN).
 | ES module syntax | Breaks all files loaded after it — game goes completely silent |
 | Missing `isFloor: true` platform | `pickSafeSpawn()` returns null → crashes on respawn |
 | Editing files in wrong directory | Legacy root `SMC.*` files are dead code — only edit `Stickman-Battles/` |
+| Editing legacy consolidated files | `js/` contains old pre-split files (`smb-admin.js`, `smb-cinematics.js`, `smb-debug.js`, `smb-enemies.js`, `smb-finishers.js`, `smb-loop.js`, `smb-menu.js`, `smb-paradox.js`, `smb-particles.js`, `smb-qte.js`, etc.) that are NOT loaded by `index.html` — edits have no effect |
 
 ---
 
