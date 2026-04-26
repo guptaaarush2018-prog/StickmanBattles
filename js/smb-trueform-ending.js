@@ -233,13 +233,19 @@ function startTFEnding(boss, isIntro) {
     // skip
     skippable: false,
     skipped:   false,
-    canReplay:  (localStorage.getItem('smc_tfEndingSeen') === '1'),
+    canReplay:  (typeof GameState !== 'undefined' && GameState.getActiveAccount && GameState.getActiveAccount()
+      ? !!GameState.getActiveAccount().data?.unlocks?.tfEndingSeen
+      : false),
 
     // intro mode: resume gameplay instead of calling endGame
     isIntro: isIntro === true,
   };
 
-  localStorage.setItem('smc_tfEndingSeen', '1');
+  if (typeof setAccountFlagWithRuntime === 'function') {
+    setAccountFlagWithRuntime(['unlocks', 'tfEndingSeen'], true, function(v) {
+      if (typeof tfEndingSeen !== 'undefined') tfEndingSeen = v;
+    });
+  }
   hero.backstageHiding = false;
   screenShake = 20;
 }
@@ -665,9 +671,11 @@ function updateTFEnding() {
       sc.timer = 0;
       _tfeAuraParticles = [];
       sc.hero._tfAuraGlow = true;
-      localStorage.setItem('smc_patrolMode', '1');
-      localStorage.setItem('smc_interTravel', '1');
-      if (settings.experimental3D) localStorage.setItem('smc_view3D', '1');
+      if (typeof setAccountFlagWithRuntime === 'function') {
+        setAccountFlagWithRuntime(['unlocks', 'patrolMode'], true, function(v) {});
+        setAccountFlagWithRuntime(['unlocks', 'interTravel'], true, function(v) {});
+      }
+      if (settings.experimental3D && typeof saveGame === 'function') saveGame();
       _tfeCamFocus(sc.hero.cx(), sc.hero.cy(), 1.5);
       sc.skippable = true;
     }

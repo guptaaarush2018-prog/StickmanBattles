@@ -972,14 +972,24 @@ function _consoleExec(raw) {
   if (cmd.startsWith('UNLOCK')) {
     if (sub === 'trueform') {
       if (typeof unlockedTrueBoss !== 'undefined') {
-        unlockedTrueBoss = true; localStorage.setItem('smc_trueform','1');
+        unlockedTrueBoss = true;
+        if (typeof setAccountFlagWithRuntime === 'function') {
+          setAccountFlagWithRuntime(['unlocks', 'trueform'], true, function(v) { unlockedTrueBoss = v; });
+        } else if (typeof saveGame === 'function') {
+          saveGame();
+        }
         const card = document.getElementById('modeTrueForm');
         if (card) card.style.display = '';
         _consoleOk('True Form unlocked!');
       }
     } else if (sub === 'megaknight') {
       if (typeof unlockedMegaknight !== 'undefined') {
-        unlockedMegaknight = true; localStorage.setItem('smc_megaknight','1');
+        unlockedMegaknight = true;
+        if (typeof setAccountFlagWithRuntime === 'function') {
+          setAccountFlagWithRuntime(['unlocks', 'megaknight'], true, function(v) { unlockedMegaknight = v; });
+        } else if (typeof saveGame === 'function') {
+          saveGame();
+        }
         ['p1Class','p2Class'].forEach(id => {
           const sel = document.getElementById(id);
           if (sel && !sel.querySelector('option[value="megaknight"]')) {

@@ -227,7 +227,7 @@ function _handleBuiltinEvent(name, data) {
     // ── Boss defeated → unlock boss mode in menu ──────────────────────────────
     case 'BOSS_DEFEATED': {
       bossBeaten = true;
-      localStorage.setItem('smc_bossBeaten', '1');
+      if (typeof saveGame === 'function') saveGame();
       const bossCard = document.getElementById('modeBoss');
       if (bossCard) bossCard.style.display = '';
       break;
@@ -236,7 +236,7 @@ function _handleBuiltinEvent(name, data) {
     // ── True Form unlocked after boss beat + all letters ──────────────────────
     case 'TRUE_FORM_UNLOCK': {
       unlockedTrueBoss = true;
-      localStorage.setItem('smc_trueform', '1');
+      if (typeof saveGame === 'function') saveGame();
       const tfCard = document.getElementById('modeTrueForm');
       if (tfCard) tfCard.style.display = '';
       _showMidFightUnlock({
@@ -409,4 +409,3 @@ function _showBossCinematicIntro(_bossRef) {
     setTimeout(() => { ov.style.display = 'none'; }, 520);
   }, totalMs);
 }
-

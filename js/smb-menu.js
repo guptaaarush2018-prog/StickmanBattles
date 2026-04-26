@@ -1962,7 +1962,10 @@ function _startGameCore() {
     // Damnation scar bonus: surviving the echo gives 10% extra damage
     if (storyModeActive) {
       try {
-        if (localStorage.getItem('smb_damnationScar')) {
+        const _acct = (typeof GameState !== 'undefined' && typeof GameState.getActiveAccount === 'function')
+          ? GameState.getActiveAccount()
+          : null;
+        if (_acct && _acct.data && _acct.data.unlocks && _acct.data.unlocks.damnationScar) {
           p1.dmgMult = (p1.dmgMult || 1.0) * 1.10;
           p1._hasDamnationScar = true;
         }
@@ -2271,7 +2274,7 @@ function refreshMenuFromAccount() {
   if (tfCard) tfCard.style.display = (typeof unlockedTrueBoss !== 'undefined' && unlockedTrueBoss) ? '' : 'none';
 
   const sovCard = document.getElementById('modeSovereign');
-  if (sovCard) sovCard.style.display = localStorage.getItem('smc_sovereignBeaten') ? '' : 'none';
+  if (sovCard) sovCard.style.display = (typeof sovereignBeaten !== 'undefined' && sovereignBeaten) ? '' : 'none';
 
   if (typeof syncCodeInput === 'function') syncCodeInput();
 }

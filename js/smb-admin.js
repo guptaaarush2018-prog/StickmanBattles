@@ -485,12 +485,13 @@ function unlockAllItems(accountId) {
   const allLetters = [0, 1, 2, 3, 4, 5, 6, 7];
 
   if (_adminIsActive(accountId)) {
-    // Set individual localStorage keys (source of truth for live game state).
-    localStorage.setItem('smc_bossBeaten',  '1');
-    localStorage.setItem('smc_trueform',    '1');
-    localStorage.setItem('smc_megaknight',  '1');
-    localStorage.setItem('smc_letters', JSON.stringify(allLetters));
-    localStorage.setItem('smc_achievements', JSON.stringify(_ADMIN_ALL_ACH_IDS));
+    if (typeof setAccountFlagWithRuntime === 'function') {
+      setAccountFlagWithRuntime(['unlocks', 'bossBeaten'], true, function(v) { bossBeaten = v; });
+      setAccountFlagWithRuntime(['unlocks', 'trueform'], true, function(v) { unlockedTrueBoss = v; });
+      setAccountFlagWithRuntime(['unlocks', 'megaknight'], true, function(v) { unlockedMegaknight = v; });
+      setAccountFlagWithRuntime(['unlocks', 'letters'], allLetters.slice(), function() {});
+      setAccountFlagWithRuntime(['unlocks', 'achievements'], _ADMIN_ALL_ACH_IDS.slice(), function() {});
+    }
     // Unlock achievements via the live function so in-memory Set stays in sync.
     if (typeof unlockAchievement === 'function') {
       _ADMIN_ALL_ACH_IDS.forEach(function(id) { unlockAchievement(id); });
@@ -523,11 +524,6 @@ function resetAccount(accountId) {
   try { localStorage.removeItem(acct.saveKey + '_backup'); } catch(e) {}
 
   if (_adminIsActive(accountId)) {
-    // Wipe individual smc_* keys that are used as live state.
-    ['smc_bossBeaten','smc_trueform','smc_megaknight',
-     'smc_letters','smc_achievements'].forEach(function(k) {
-      try { localStorage.removeItem(k); } catch(e) {}
-    });
     // Reload save system to restore defaults.
     if (typeof loadGame === 'function') loadGame();
     _adminLog('Active account reset to defaults.');

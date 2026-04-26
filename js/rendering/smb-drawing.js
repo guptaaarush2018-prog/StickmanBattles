@@ -856,7 +856,11 @@ function updateBossDeathScene() {
       const _customWpnUsed = players.some(p => !p.isBoss && p.weapon && p.weapon._isCustom);
       if (!bossBeaten && gameMode === 'boss' && !_customWpnUsed) {
         bossBeaten = true;
-        localStorage.setItem('smc_bossBeaten', '1');
+        if (typeof setAccountFlagWithRuntime === 'function') {
+          setAccountFlagWithRuntime(['unlocks', 'bossBeaten'], true, function(v) { bossBeaten = v; });
+        } else if (typeof saveGame === 'function') {
+          saveGame();
+        }
         // Unlock boss card for future free-play now that it's been beaten via story
         const _bossCard = document.getElementById('modeBoss');
         if (_bossCard) _bossCard.style.display = '';

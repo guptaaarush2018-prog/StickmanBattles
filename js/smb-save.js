@@ -1,6 +1,8 @@
 // smc-save.js — Persistent save system: auto-save, export, import
 'use strict';
 
+console.info('[BOOT ORDER] smb-save init');
+
 const SAVE_VERSION = 3;
 const SAVE_KEY     = 'smb_state';
 const CANONICAL_SAVE_KEY = 'smb_state';
@@ -80,6 +82,9 @@ function _normalizeAccountSaveShape(data) {
   const out = JSON.parse(JSON.stringify(data));
   if (typeof out.version !== 'number') out.version = SAVE_VERSION;
   if (!out.unlocks || typeof out.unlocks !== 'object') out.unlocks = {};
+  if (Array.isArray(out.achievements) && !Array.isArray(out.unlocks.achievements)) {
+    out.unlocks.achievements = out.achievements.slice();
+  }
   if (!Array.isArray(out.cosmetics)) {
     out.cosmetics = Array.isArray(out.unlockedCosmetics) ? out.unlockedCosmetics.slice() : [];
   }
@@ -87,7 +92,13 @@ function _normalizeAccountSaveShape(data) {
     if (typeof out.playerCoins === 'number') out.coins = out.playerCoins;
     else if (out.progression && typeof out.progression.coins === 'number') out.coins = out.progression.coins;
     else if (out.story && typeof out.story.coins === 'number') out.coins = out.story.coins;
+    else if (typeof out.chapter === 'number' && out.chapter > 0) out.coins = out.coins || 0;
     else out.coins = 0;
+  }
+  if (typeof out.chapter !== 'number') {
+    if (out.storyProgress && typeof out.storyProgress.chapter === 'number') out.chapter = out.storyProgress.chapter;
+    else if (out.story && typeof out.story.chapter === 'number') out.chapter = out.story.chapter;
+    else out.chapter = 0;
   }
   if (out.storyProgress && typeof out.storyProgress === 'object') {
     if (!out.story || typeof out.story !== 'object') out.story = {};
@@ -103,21 +114,26 @@ function _normalizeAccountSaveShape(data) {
     if (!Array.isArray(out.storyProgress.defeated) && Array.isArray(out.story.defeated)) out.storyProgress.defeated = out.story.defeated.slice();
     if (!out.storyProgress.flags || typeof out.storyProgress.flags !== 'object') out.storyProgress.flags = {};
   }
+  if (!Array.isArray(out.achievements)) {
+    out.achievements = Array.isArray(out.unlocks.achievements) ? out.unlocks.achievements.slice() : [];
+  }
   if (!out.meta || typeof out.meta !== 'object') out.meta = {};
   if (typeof out.meta.updatedAt !== 'number') out.meta.updatedAt = 0;
+  if (typeof out.updatedAt !== 'number') out.updatedAt = out.meta.updatedAt || 0;
+  if (typeof out.chapter !== 'number' && typeof out.storyProgress === 'object' && typeof out.storyProgress.chapter === 'number') {
+    out.chapter = out.storyProgress.chapter;
+  }
   return out;
 }
 
 function _saveSnapshotSummary(data) {
   const d = _normalizeAccountSaveShape(data) || {};
   const coins = typeof d.coins === 'number' ? d.coins : 0;
-  const story = d.story || {};
-  const storyProgress = d.storyProgress || {};
-  const chapter = (typeof story.chapter === 'number')
-    ? story.chapter
-    : (typeof storyProgress.chapter === 'number'
-      ? storyProgress.chapter
-      : 0);
+  const chapter = (typeof d.chapter === 'number')
+    ? d.chapter
+    : (d.storyProgress && typeof d.storyProgress.chapter === 'number'
+      ? d.storyProgress.chapter
+      : (d.story && typeof d.story.chapter === 'number' ? d.story.chapter : 0));
   return { coins, chapter };
 }
 
@@ -130,6 +146,7 @@ function _canonicalSaveMeaningful(data) {
   const d = _normalizeAccountSaveShape(data);
   if (!d || typeof d !== 'object') return false;
   if (d.story && Array.isArray(d.story.defeated) && d.story.defeated.length > 0) return true;
+  if (typeof d.chapter === 'number' && d.chapter > 0) return true;
   if (d.storyProgress && typeof d.storyProgress.chapter === 'number' && d.storyProgress.chapter > 0) return true;
   if (d.story && typeof d.story.chapter === 'number' && d.story.chapter > 0) return true;
   if (d.story && (d.story.storyComplete || (Array.isArray(d.story.blueprints) && d.story.blueprints.length > 0))) return true;
@@ -147,7 +164,9 @@ function _canonicalSaveMeaningful(data) {
 const _SAVE_DEFAULTS = {
   version: SAVE_VERSION,
   coins: 0,
+  chapter: 0,
   cosmetics: [],
+  achievements: [],
   unlocks: {
     bossBeaten:         false,
     trueform:           false,
@@ -171,6 +190,7 @@ const _SAVE_DEFAULTS = {
     musicMute: false,
     ragdoll:   false,
   },
+  updatedAt: 0,
 };
 
 // ── Custom Weapon helpers ─────────────────────────────────────────────────────
@@ -279,9 +299,19 @@ function _gatherSaveData() {
   const active = (typeof GameState !== 'undefined' && typeof GameState.getActiveAccount === 'function')
     ? GameState.getActiveAccount()
     : null;
+  const chapter = (typeof STORY_PROGRESS !== 'undefined' && typeof STORY_PROGRESS.chapter === 'number')
+    ? STORY_PROGRESS.chapter
+    : ((active && active.data && typeof active.data.chapter === 'number') ? active.data.chapter : 0);
+  const updatedAt = (active && active.data && typeof active.data.updatedAt === 'number')
+    ? active.data.updatedAt
+    : (active && active.data && active.data.meta && typeof active.data.meta.updatedAt === 'number'
+      ? active.data.meta.updatedAt
+      : 0);
+  const achievements = (typeof earnedAchievements !== 'undefined') ? Array.from(earnedAchievements) : [];
   return {
     version: SAVE_VERSION,
     story: (typeof getStoryDataForSave === 'function') ? getStoryDataForSave() : null,
+    chapter,
     storyProgress: (typeof STORY_PROGRESS !== 'undefined') ? {
       act:     STORY_PROGRESS.act,
       chapter: STORY_PROGRESS.chapter,
@@ -313,12 +343,12 @@ function _gatherSaveData() {
     },
     coins:     (typeof playerCoins        !== 'undefined') ? playerCoins                  : 0,
     cosmetics: (typeof unlockedCosmetics  !== 'undefined') ? unlockedCosmetics.slice()    : [],
+    achievements,
     meta: {
-      updatedAt: (active && active.data && active.data.meta && typeof active.data.meta.updatedAt === 'number')
-        ? active.data.meta.updatedAt
-        : 0,
+      updatedAt,
       source: (active && active.data && active.data.meta && active.data.meta.source) || 'local',
     },
+    updatedAt,
     settings: {
       sfxVol:    parseFloat(localStorage.getItem('smc_sfxVol') || '0.35'),
       sfxMute:   (localStorage.getItem('smc_sfxMute')    === '1'),
@@ -332,32 +362,6 @@ function _gatherSaveData() {
 // ── Write save data back into individual localStorage keys ────────────────────
 function _applySaveData(data) {
   const d = _deepMerge(_SAVE_DEFAULTS, data);
-
-  if (d.unlocks.bossBeaten)    localStorage.setItem('smc_bossBeaten',  '1');
-  else                          localStorage.removeItem('smc_bossBeaten');
-  if (d.unlocks.trueform)      localStorage.setItem('smc_trueform',    '1');
-  else                          localStorage.removeItem('smc_trueform');
-  if (d.unlocks.megaknight)    localStorage.setItem('smc_megaknight',  '1');
-  else                          localStorage.removeItem('smc_megaknight');
-  localStorage.setItem('smc_letters',      JSON.stringify(d.unlocks.letters));
-  localStorage.setItem('smc_achievements', JSON.stringify(d.unlocks.achievements));
-  localStorage.setItem('smc_sfxVol',       String(d.settings.sfxVol));
-  localStorage.setItem('smc_sfxMute',      d.settings.sfxMute    ? '1' : '0');
-  localStorage.setItem('smc_musicMute',    d.settings.musicMute  ? '1' : '0');
-  localStorage.setItem('smc_ragdoll',      d.settings.ragdoll    ? '1' : '0');
-  // Extended account-scoped flags
-  if (d.unlocks.sovereignBeaten)    localStorage.setItem('smc_sovereignBeaten',    '1');
-  else                               localStorage.removeItem('smc_sovereignBeaten');
-  if (d.unlocks.storyOnline)        localStorage.setItem('smc_storyOnline',        '1');
-  else                               localStorage.removeItem('smc_storyOnline');
-  if (d.unlocks.tfEndingSeen)       localStorage.setItem('smc_tfEndingSeen',       '1');
-  else                               localStorage.removeItem('smc_tfEndingSeen');
-  if (d.unlocks.damnationScar)      localStorage.setItem('smb_damnationScar',      '1');
-  else                               localStorage.removeItem('smb_damnationScar');
-  if (d.unlocks.storyDodgeUnlocked) localStorage.setItem('smc_storyDodgeUnlocked', '1');
-  else                               localStorage.removeItem('smc_storyDodgeUnlocked');
-  if (d.unlocks.paradoxCompanion)   localStorage.setItem('smc_paradox_companion',  '1');
-  else                               localStorage.removeItem('smc_paradox_companion');
   if (typeof restoreStoryDataFromSave === 'function') {
     // Always restore story data — fall back to default so switching to a new account
     // (which has no story field) resets _story2 instead of leaving the old account's data.
@@ -557,18 +561,8 @@ function addLetter(id) {
 }
 
 // ── Legacy key cleanup ────────────────────────────────────────────────────────
-const _LEGACY_ACCOUNT_KEYS = [
-  'smc_sovereignBeaten', 'smc_storyOnline', 'smc_storyDodgeUnlocked',
-  'smc_paradox_companion',
-  'smc_tfEndingSeen', 'smb_damnationScar', 'smc_interTravel', 'smc_patrolMode',
-  'smc_bossBeaten', 'smc_trueform', 'smc_letters', 'smc_megaknight',
-  'smc_achievements',
-];
-
 function _clearLegacyKeys() {
-  _LEGACY_ACCOUNT_KEYS.forEach(function(k) {
-    try { localStorage.removeItem(k); } catch(e) {}
-  });
+  return;
 }
 
 // ── Rehydration guard (keyed by account ID, not a boolean) ───────────────────
@@ -581,7 +575,7 @@ function forceRehydrateFromAccount(acct) {
 
 // ── Dev guard: warn on stale localStorage reads for account-scoped keys ───────
 function _guardLocalStorageRead(key) {
-  if (_LEGACY_ACCOUNT_KEYS.indexOf(key) !== -1) {
+  if (key && /^smc_|^smb_(bossBeaten|trueform|megaknight|sovereignBeaten|storyOnline|storyDodgeUnlocked|damnationScar|interTravel|patrolMode)$/.test(key)) {
     console.warn('[storage] Blocked localStorage read for account-scoped key:', key,
       '— use runtime globals instead.');
   }
@@ -617,6 +611,11 @@ function saveGame() {
     if (!acct) return;
     const data = _gatherSaveData();
     const normalized = _normalizeAccountSaveShape(data) || data;
+    const summary = _saveSnapshotSummary(normalized);
+    if (!_canonicalSaveMeaningful(normalized)) {
+      console.info('[DEFAULT BLOCKED]', summary);
+      return;
+    }
     const preserveTs = (window.__SMB_PENDING_SAVE_TIMESTAMP !== undefined);
     normalized.meta = {
       updatedAt: preserveTs
@@ -624,6 +623,7 @@ function saveGame() {
         : Date.now(),
       source: 'local',
     };
+    normalized.updatedAt = normalized.meta.updatedAt;
     // Preserve the _legacyCleared flag so cleanup is not undone on next load
     if (acct.data && acct.data._legacyCleared) normalized._legacyCleared = true;
     GameState.update(function(s) {
@@ -632,8 +632,8 @@ function saveGame() {
     });
     GameState.save();
     _writeCanonicalSave(normalized);
-    _logSaveState('SAVE KEY', normalized, 'written');
-    console.info('[SAVE VERIFIED]', _saveSnapshotSummary(normalized));
+    _logSaveState('SAVE FINAL', normalized, 'written');
+    console.info('[SAVE VERIFIED]', summary);
     if (!window.__SMB_SUPPRESS_CLOUD_SYNC && window.SupabaseBridge && typeof SupabaseBridge.queueSyncFromRuntime === 'function') {
       SupabaseBridge.queueSyncFromRuntime(normalized);
     }
@@ -660,7 +660,7 @@ function loadGame() {
     if (canonical && _canonicalSaveMeaningful(canonical)) {
       const summary = _saveSnapshotSummary(canonical);
       console.info(`[LOAD FOUND] coins=${summary.coins} chapter=${summary.chapter}`);
-      _logSaveState('LOAD KEY', canonical, 'loaded');
+      _logSaveState('LOAD FINAL', canonical, 'loaded');
       console.info('[LOAD VERIFIED]', summary);
       _applySaveData(canonical);
       _refreshRuntimeFromSave(canonical);
@@ -678,19 +678,10 @@ function loadGame() {
     // ── Primary path: account.data in GameState ───────────────────────────────
     if (acct && acct.data && typeof acct.data.version === 'number') {
       const data = acct.data.version < SAVE_VERSION ? _migrateSave(acct.data) : acct.data;
-      // One-time legacy key cleanup per account (committed synchronously before removeItem)
-      if (!acct.data._legacyCleared) {
-        GameState.update(function(s) {
-          const a = s.persistent.accounts[s.persistent.activeAccountId];
-          if (a && a.data) a.data._legacyCleared = true;
-        });
-        GameState.save();
-        _clearLegacyKeys();
-      }
       _applySaveData(data);
       _refreshRuntimeFromSave(data);
       _writeCanonicalSave(data);
-      _logSaveState('LOAD KEY', data, 'loaded');
+      _logSaveState('LOAD FINAL', data, 'loaded');
       console.info('[LOAD VERIFIED]', _saveSnapshotSummary(data));
       _queueCloudReconcile();
       return;
@@ -702,19 +693,13 @@ function loadGame() {
     // globals don't bleed through.
     if (typeof resetProgressionGlobals   === 'function') resetProgressionGlobals();
     if (typeof resetAccountScopedGlobals === 'function') resetAccountScopedGlobals();
-    // Clear all account-scoped localStorage caches so the new account starts clean.
-    // No-ops on initial page load; only meaningful during in-session account switches.
-    try {
-      ['smc_sovereignBeaten','smc_storyOnline','smc_tfEndingSeen',
-       'smb_damnationScar','smc_storyDodgeUnlocked','smc_paradox_companion']
-        .forEach(function(k) { localStorage.removeItem(k); });
-    } catch(e) {}
-    _logSaveState('LOAD KEY', { coins: 0, storyProgress: { chapter: 0 } }, 'defaults used');
+    console.info('[DEFAULT BLOCKED]', { coins: 0, chapter: 0 });
+    _logSaveState('LOAD FINAL', { coins: 0, chapter: 0, storyProgress: { chapter: 0 } }, 'defaults used');
     if (typeof restoreStoryDataFromSave === 'function' &&
         typeof _defaultStory2Progress === 'function') {
       restoreStoryDataFromSave(_defaultStory2Progress());
     }
-    _queueCloudReconcile();
+    window.__SMB_SAVE_READY = true;
   } catch(e) {
     console.warn('[SMC Save] Load failed:', e);
   }
@@ -850,6 +835,7 @@ setInterval(saveGame, 15000);
 
 // ── Load on startup ───────────────────────────────────────────────────────────
 loadGame();
+window.__SMB_SAVE_READY = true;
 
 function _queueCloudReconcile() {
   if (window.__SMB_SUPPRESS_CLOUD_SYNC) return;

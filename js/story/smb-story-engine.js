@@ -1190,8 +1190,13 @@ function story2OnMatchEnd(playerWon) {
   _story2.runState.noDeathChain = (_story2.runState.noDeathChain || 0) + 1;
 
   // Sovereign chapter win — unlock Neural AI and Sovereign Ω modes
-  if (ch.isSovereignFight && !localStorage.getItem('smc_sovereignBeaten')) {
-    localStorage.setItem('smc_sovereignBeaten', '1');
+  if (ch.isSovereignFight && !sovereignBeaten) {
+    sovereignBeaten = true;
+    if (typeof setAccountFlagWithRuntime === 'function') {
+      setAccountFlagWithRuntime(['unlocks', 'sovereignBeaten'], true, function(v) { sovereignBeaten = v; });
+    } else if (typeof saveGame === 'function') {
+      saveGame();
+    }
     const adCard  = document.getElementById('modeAdaptive');
     const sovCard = document.getElementById('modeSovereign');
     if (adCard)  adCard.style.display  = '';
@@ -1279,7 +1284,12 @@ function _completeChapter2(ch) {
 
 function _completeStory2() {
   _story2.storyComplete = true;
-  localStorage.setItem('smc_storyOnline', '1');
+  storyOnline = true;
+  if (typeof setAccountFlagWithRuntime === 'function') {
+    setAccountFlagWithRuntime(['unlocks', 'storyOnline'], true, function(v) { storyOnline = v; });
+  } else if (typeof saveGame === 'function') {
+    saveGame();
+  }
   // Show Story Online mode card
   const soCard = document.getElementById('modeStoryOnline');
   if (soCard) soCard.style.display = '';
@@ -1312,7 +1322,7 @@ function _showStory2Victory(ch) {
     if (ch.isEpilogue || _story2.storyComplete) {
       html += `<div style="color:#ffaaff;font-size:0.76rem;margin-top:5px;font-style:italic;">🌐⚔️ Story Online mode unlocked!</div>`;
     }
-    if (ch.isSovereignFight && localStorage.getItem('smc_sovereignBeaten')) {
+    if (ch.isSovereignFight && sovereignBeaten) {
       html += `<div style="color:#cc44ff;font-size:0.82rem;margin-top:8px;font-weight:800;letter-spacing:1px;text-shadow:0 0 10px #cc44ff;">⚡ NEURAL AI MODES UNLOCKED</div>`;
       html += `<div style="color:#aa88dd;font-size:0.72rem;margin-top:2px;font-style:italic;">Challenge SOVEREIGN &amp; SOVEREIGN Ω from the main menu.</div>`;
     }
@@ -1408,7 +1418,7 @@ function storyVictoryBackToMenu() {
 
 // ── Init: show Story Online card if already complete ─────────────────────────
 (function _story2Init() {
-  if (_story2.storyComplete || localStorage.getItem('smc_storyOnline')) {
+  if (_story2.storyComplete || storyOnline) {
     const soCard = document.getElementById('modeStoryOnline');
     if (soCard) soCard.style.display = '';
   }
@@ -1451,7 +1461,7 @@ const storyState = {
   storyState.abilities.doubleJump    = !!sk.doubleJump;
   storyState.abilities.weaponAbility = !!(sk.weaponAbility || sk.weaponAbilityOld);
   storyState.abilities.superMeter    = !!sk.superMeter;
-  storyState.abilities.dodge         = !!sk.dodge || !!localStorage.getItem('smc_storyDodgeUnlocked');
+  storyState.abilities.dodge         = !!sk.dodge || !!storyDodgeUnlocked;
   storyDodgeUnlocked                 = storyState.abilities.dodge;
 })();
 
@@ -1516,7 +1526,11 @@ function _handleBuiltinEvent(name, data) {
       if (!storyState.abilities.dodge && storyState.chapter >= 9) {
         storyState.abilities.dodge = true;
         storyDodgeUnlocked = true;
-        localStorage.setItem('smc_storyDodgeUnlocked', '1');
+        if (typeof setAccountFlagWithRuntime === 'function') {
+          setAccountFlagWithRuntime(['unlocks', 'storyDodgeUnlocked'], true, function(v) { storyDodgeUnlocked = v; });
+        } else if (typeof saveGame === 'function') {
+          saveGame();
+        }
         _showMidFightUnlock({
           icon: '💨',
           name: 'Dodge Roll',
@@ -1629,7 +1643,11 @@ function _handleBuiltinEvent(name, data) {
     // ── Boss defeated → unlock boss mode in menu ──────────────────────────────
     case 'BOSS_DEFEATED': {
       bossBeaten = true;
-      localStorage.setItem('smc_bossBeaten', '1');
+      if (typeof setAccountFlagWithRuntime === 'function') {
+        setAccountFlagWithRuntime(['unlocks', 'bossBeaten'], true, function(v) { bossBeaten = v; });
+      } else if (typeof saveGame === 'function') {
+        saveGame();
+      }
       const bossCard = document.getElementById('modeBoss');
       if (bossCard) bossCard.style.display = '';
       break;
@@ -1638,7 +1656,11 @@ function _handleBuiltinEvent(name, data) {
     // ── True Form unlocked after boss beat + all letters ──────────────────────
     case 'TRUE_FORM_UNLOCK': {
       unlockedTrueBoss = true;
-      localStorage.setItem('smc_trueform', '1');
+      if (typeof setAccountFlagWithRuntime === 'function') {
+        setAccountFlagWithRuntime(['unlocks', 'trueform'], true, function(v) { unlockedTrueBoss = v; });
+      } else if (typeof saveGame === 'function') {
+        saveGame();
+      }
       const tfCard = document.getElementById('modeTrueForm');
       if (tfCard) tfCard.style.display = '';
       _showMidFightUnlock({
