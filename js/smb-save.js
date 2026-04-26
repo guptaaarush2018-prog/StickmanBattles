@@ -2,8 +2,8 @@
 'use strict';
 
 const SAVE_VERSION = 3;
-const SAVE_KEY     = 'smc_save_v1'; // legacy fallback key (used when AccountManager is absent)
-const CANONICAL_SAVE_KEY = 'smc_save_v1';
+const SAVE_KEY     = 'smb_state';
+const CANONICAL_SAVE_KEY = 'smb_state';
 
 // Dynamic key helpers — route through AccountManager when available so each
 // account gets its own isolated save slot.
@@ -26,7 +26,15 @@ function _parseMaybeEncodedSave(raw) {
 
 function _readCanonicalSave() {
   try {
-    return _parseMaybeEncodedSave(localStorage.getItem(CANONICAL_SAVE_KEY));
+    const raw = localStorage.getItem(CANONICAL_SAVE_KEY);
+    if (!raw) return null;
+    const parsed = _parseMaybeEncodedSave(raw);
+    if (!parsed) return null;
+    if (parsed && parsed.accounts && parsed.activeAccountId) {
+      const acct = parsed.accounts[parsed.activeAccountId];
+      return acct && acct.data ? acct.data : null;
+    }
+    return parsed;
   } catch(e) {
     console.warn('[SAVE] parse failed', e);
     return null;
@@ -35,7 +43,11 @@ function _readCanonicalSave() {
 
 function _writeCanonicalSave(data) {
   try {
-    localStorage.setItem(CANONICAL_SAVE_KEY, JSON.stringify(data));
+    if (window.GameState && typeof GameState.getPersistent === 'function') {
+      localStorage.setItem(CANONICAL_SAVE_KEY, JSON.stringify(GameState.getPersistent()));
+    } else {
+      localStorage.setItem(CANONICAL_SAVE_KEY, JSON.stringify(data));
+    }
   } catch(e) {
     console.warn('[save] save write failed: canonical save', e);
   }
@@ -54,7 +66,7 @@ function _saveSnapshotSummary(data) {
 
 function _logSaveState(prefix, data, suffix) {
   const s = _saveSnapshotSummary(data);
-  console.info(`[${prefix}] coins=${s.coins} chapter=${s.chapter} ${suffix}`);
+  console.info(`[${prefix}] ${CANONICAL_SAVE_KEY} ${suffix}`, { coins: s.coins, chapter: s.chapter });
 }
 
 function _canonicalSaveMeaningful(data) {
@@ -559,7 +571,7 @@ function saveGame() {
     });
     GameState.save();
     _writeCanonicalSave(data);
-    _logSaveState('SAVE', data, 'written');
+    _logSaveState('SAVE KEY', data, 'written');
     if (!window.__SMB_SUPPRESS_CLOUD_SYNC && window.SupabaseBridge && typeof SupabaseBridge.queueSyncFromRuntime === 'function') {
       SupabaseBridge.queueSyncFromRuntime(data);
     }
@@ -574,7 +586,7 @@ function loadGame() {
     const acct = window.GameState ? GameState.getActiveAccount() : null;
     const canonical = _readCanonicalSave();
     if (canonical && _canonicalSaveMeaningful(canonical)) {
-      _logSaveState('LOAD', canonical, 'loaded');
+      _logSaveState('LOAD KEY', canonical, 'loaded');
       _applySaveData(canonical);
       _refreshRuntimeFromSave(canonical);
       if (acct && acct.data !== canonical) {
@@ -603,38 +615,9 @@ function loadGame() {
       _applySaveData(data);
       _refreshRuntimeFromSave(data);
       _writeCanonicalSave(data);
-      _logSaveState('LOAD', data, 'loaded');
+      _logSaveState('LOAD KEY', data, 'loaded');
       _queueCloudReconcile();
       return;
-    }
-
-    // ── Migration path: legacy per-account localStorage blob ─────────────────
-    const legacyKey = acct ? (acct.saveKey || SAVE_KEY) : SAVE_KEY;
-    const raw = localStorage.getItem(legacyKey);
-    if (raw) {
-      try {
-        let data = JSON.parse(decodeURIComponent(escape(atob(raw))));
-        if (data && typeof data.version === 'number') {
-          if (data.version < SAVE_VERSION) data = _migrateSave(data);
-          _applySaveData(data);
-          _refreshRuntimeFromSave(data);
-          _writeCanonicalSave(data);
-          _logSaveState('LOAD', data, 'loaded');
-          // One-time migration: write into GameState so future loads use the new path
-          window.__SMB_SUPPRESS_CLOUD_SYNC = true;
-          window.__SMB_PENDING_SAVE_TIMESTAMP = 0;
-          try {
-            saveGame();
-          } finally {
-            window.__SMB_SUPPRESS_CLOUD_SYNC = false;
-            window.__SMB_PENDING_SAVE_TIMESTAMP = undefined;
-          }
-          _queueCloudReconcile();
-          return;
-        }
-    } catch(e) {
-        console.warn('[SAVE] parse failed', e);
-      }
     }
 
     // ── First run: no save data yet ───────────────────────────────────────────
@@ -650,7 +633,7 @@ function loadGame() {
        'smb_damnationScar','smc_storyDodgeUnlocked','smc_paradox_companion']
         .forEach(function(k) { localStorage.removeItem(k); });
     } catch(e) {}
-    _logSaveState('LOAD', { coins: 0, storyProgress: { chapter: 0 } }, 'defaults used');
+    _logSaveState('LOAD KEY', { coins: 0, storyProgress: { chapter: 0 } }, 'defaults used');
     if (typeof restoreStoryDataFromSave === 'function' &&
         typeof _defaultStory2Progress === 'function') {
       restoreStoryDataFromSave(_defaultStory2Progress());

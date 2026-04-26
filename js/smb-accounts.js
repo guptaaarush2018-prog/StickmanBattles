@@ -111,7 +111,7 @@ const AccountManager = (() => {
     }
 
     // First run or fully corrupted — seed a default "Player 1" account.
-    // Use the legacy save key so no existing save data is lost on migration.
+    // All progression now lives under smb_state; saveKey is kept only as legacy metadata.
     const defaultId = 'acct_default';
     GameState.update(s => {
       s.persistent.activeAccountId = defaultId;
@@ -120,7 +120,7 @@ const AccountManager = (() => {
           id:        defaultId,
           username:  'Player 1',
           createdAt: Date.now(),
-          saveKey:   'smc_save_v1',
+          saveKey:   'smb_state',
           role:      'player',
         },
       };
@@ -135,8 +135,7 @@ const AccountManager = (() => {
   }
 
   function getActiveSaveKey() {
-    const acct = getActiveAccount();
-    return acct ? acct.saveKey : 'smc_save_v1';
+    return 'smb_state';
   }
 
   function getAllAccounts() {
@@ -193,8 +192,10 @@ const AccountManager = (() => {
     const acct = p.accounts[id];
     // Remove save data for this account
     try {
-      localStorage.removeItem(acct.saveKey);
-      localStorage.removeItem(acct.saveKey + '_backup');
+      if (acct.saveKey && acct.saveKey !== 'smb_state') {
+        localStorage.removeItem(acct.saveKey);
+        localStorage.removeItem(acct.saveKey + '_backup');
+      }
     } catch(e) {}
     const wasActive = (p.activeAccountId === id);
     GameState.update(s => { delete s.persistent.accounts[id]; });
