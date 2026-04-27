@@ -312,7 +312,10 @@ function _flushRuntimeIntoBase(base) {
   // story — _story2 lives in smb-story-config.js; flush its snapshot
   if (typeof getStoryDataForSave === 'function') {
     const _snap = getStoryDataForSave();
-    if (_snap && Array.isArray(_snap.defeated)) base.story = _snap;
+    if (_snap && Array.isArray(_snap.defeated)) {
+      base.story = _snap;
+      console.info('[STORY FLUSH]', { defeated: _snap.defeated.length, chapter: _snap.chapter });
+    }
   }
   // storyProgress — STORY_PROGRESS is mutated directly in smb-progression.js
   if (typeof STORY_PROGRESS !== 'undefined') {
@@ -559,9 +562,9 @@ function queueGameStateSave() {
   if (_saveQueued) return;
   _saveQueued = true;
   _saveTimer = setTimeout(function() {
-    if (window.GameState) GameState.save();
     _saveQueued = false;
     _saveTimer  = null;
+    saveGame(); // full flush — captures _story2 and all volatile runtime state
   }, 50);
 }
 
@@ -666,8 +669,21 @@ function _clearLegacyKeys() {
 let _hydratedAccountId = null;
 
 function forceRehydrateFromAccount(acct) {
-  _hydratedAccountId = null;
-  _refreshRuntimeFromSave(acct ? acct.data : null);
+  _hydratedAccountId = null; // always bypass the _hydratedAccountId guard
+  const _fdata = acct && acct.data ? _normalizeAccountSaveShape(acct.data) : null;
+  const _fsum  = _fdata ? _saveSnapshotSummary(_fdata) : { coins: 0, chapter: 0 };
+  console.info('[FORCE REHYDRATE]', { acct: acct ? acct.id : 'none', coins: _fsum.coins, chapter: _fsum.chapter, meaningful: !!(_fdata && _canonicalSaveMeaningful(_fdata)) });
+  if (_fdata && _canonicalSaveMeaningful(_fdata)) {
+    _applySaveData(_fdata);
+    _refreshRuntimeFromSave(_fdata);
+  } else {
+    if (typeof resetProgressionGlobals   === 'function') resetProgressionGlobals();
+    if (typeof resetAccountScopedGlobals === 'function') resetAccountScopedGlobals();
+    if (typeof restoreStoryDataFromSave === 'function' && typeof _defaultStory2Progress === 'function') {
+      restoreStoryDataFromSave(_defaultStory2Progress());
+    }
+  }
+  if (typeof refreshCoinDisplay === 'function') refreshCoinDisplay();
 }
 
 // ── Dev guard: warn on stale localStorage reads for account-scoped keys ───────
@@ -686,9 +702,7 @@ function _guardLocalStorageRead(key) {
     clearTimeout(_saveTimer);
     _saveTimer  = null;
     _saveQueued = false;
-    if (window.GameState) {
-      try { GameState.save(); } catch(e) {}
-    }
+    try { saveGame(); } catch(e) {} // full flush — captures _story2 before tab closes
     // Reset flag after a tick so the handler can fire again after navigation (e.g. spa reload)
     setTimeout(function() { _flushInProgress = false; }, 200);
   }
@@ -718,6 +732,7 @@ function saveGame() {
       console.info('[DEFAULT BLOCKED]', summary);
       return;
     }
+    console.info('[SAVE WRITE]', { acct: acct.id, coins: summary.coins, chapter: summary.chapter });
     const preserveTs = (window.__SMB_PENDING_SAVE_TIMESTAMP !== undefined);
     normalized.meta = {
       updatedAt: preserveTs ? Number(window.__SMB_PENDING_SAVE_TIMESTAMP) || 0 : Date.now(),
@@ -746,6 +761,7 @@ function saveGame() {
 function loadGame() {
   try {
     const acct = window.GameState ? GameState.getActiveAccount() : null;
+    console.info('[BOOT LOAD] start', { acct: acct ? acct.id : 'none' });
     const root = (window.GameState && typeof GameState.getPersistent === 'function')
       ? GameState.getPersistent()
       : _readCanonicalStateRoot();
@@ -790,6 +806,7 @@ function loadGame() {
         _writeCanonicalSave(canonical);
       }
       _queueCloudReconcile();
+      if (typeof refreshCoinDisplay === 'function') refreshCoinDisplay();
       return;
     }
 
@@ -807,6 +824,7 @@ function loadGame() {
       _logSaveState('LOAD FINAL', data, 'loaded');
       console.info('[LOAD VERIFIED]', _saveSnapshotSummary(data));
       _queueCloudReconcile();
+      if (typeof refreshCoinDisplay === 'function') refreshCoinDisplay();
       return;
     }
 
@@ -819,6 +837,7 @@ function loadGame() {
         typeof _defaultStory2Progress === 'function') {
       restoreStoryDataFromSave(_defaultStory2Progress());
     }
+    if (typeof refreshCoinDisplay === 'function') refreshCoinDisplay();
     window.__SMB_SAVE_READY = true;
   } catch(e) {
     console.warn('[SMC Save] Load failed:', e);

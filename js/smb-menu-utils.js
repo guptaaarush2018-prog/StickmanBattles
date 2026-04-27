@@ -73,6 +73,7 @@ function refreshMenuFromAccount() {
   const sovCard = document.getElementById('modeSovereign');
   if (sovCard) sovCard.style.display = (typeof sovereignBeaten !== 'undefined' && sovereignBeaten) ? '' : 'none';
 
+  if (typeof refreshCoinDisplay === 'function') refreshCoinDisplay();
   if (typeof syncCodeInput === 'function') syncCodeInput();
 }
 

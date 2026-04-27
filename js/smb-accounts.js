@@ -104,8 +104,14 @@ const AccountManager = (() => {
       });
     }
 
-    // Already have a valid active account — flush and return
-    if (p.accounts && Object.keys(p.accounts).length > 0 && GameState.getPersistent().activeAccountId) {
+    // Already have accounts — ensure activeAccountId is valid, then flush and return.
+    // NEVER wipe existing accounts here. Only seed when accounts is truly empty.
+    if (p.accounts && Object.keys(p.accounts).length > 0) {
+      const _currId = GameState.getPersistent().activeAccountId;
+      if (!_currId || !GameState.getPersistent().accounts[_currId]) {
+        const _firstKey = Object.keys(p.accounts)[0];
+        GameState.update(function(s) { s.persistent.activeAccountId = _firstKey; });
+      }
       _persist();
       return;
     }
@@ -193,12 +199,23 @@ const AccountManager = (() => {
     const p = GameState.getPersistent();
     if (!p.accounts[id]) return false;
     if (p.activeAccountId === id) return true;
-    // Flush current account's state before switching
+    // Flush current account before switching
+    const fromId = p.activeAccountId;
     if (typeof saveGame === 'function') saveGame();
+    // Change active account
     GameState.update(s => { s.persistent.activeAccountId = id; });
     _persist();
-    // Restore the newly active account's saved state
-    if (typeof loadGame === 'function') loadGame();
+    // Fully rehydrate runtime from new account — bypasses _hydratedAccountId guard
+    // so switching A→B→A always re-hydrates A's data correctly.
+    const newAcct = GameState.getPersistent().accounts[id];
+    const _newCoins   = newAcct && newAcct.data ? (newAcct.data.coins   || 0) : 0;
+    const _newChapter = newAcct && newAcct.data ? (newAcct.data.chapter || 0) : 0;
+    console.info('[ACCOUNT SWITCH]', { from: fromId, to: id, coins: _newCoins, chapter: _newChapter });
+    if (typeof forceRehydrateFromAccount === 'function') {
+      forceRehydrateFromAccount(newAcct);
+    } else if (typeof loadGame === 'function') {
+      loadGame();
+    }
     if (typeof refreshMenuFromAccount === 'function') refreshMenuFromAccount();
     return true;
   }
@@ -226,7 +243,12 @@ const AccountManager = (() => {
       } else {
         GameState.update(s => { s.persistent.activeAccountId = remaining[0]; });
       }
-      if (typeof loadGame === 'function') loadGame();
+      const replacementAcct = GameState.getActiveAccount();
+      if (typeof forceRehydrateFromAccount === 'function') {
+        forceRehydrateFromAccount(replacementAcct);
+      } else if (typeof loadGame === 'function') {
+        loadGame();
+      }
       if (typeof refreshMenuFromAccount === 'function') refreshMenuFromAccount();
     }
     _persist();

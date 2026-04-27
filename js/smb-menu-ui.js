@@ -249,6 +249,12 @@ function getCoinBalance() {
   return coinBalance;
 }
 
+function refreshCoinDisplay() {
+  if (typeof getCoins === 'function') coinBalance = getCoins();
+  else if (typeof playerCoins === 'number') coinBalance = playerCoins;
+  _syncCoinDisplay();
+}
+
 function setCoinBalance(value) {
   const next = Math.max(0, Math.floor(Number(value) || 0));
   coinBalance = next;
