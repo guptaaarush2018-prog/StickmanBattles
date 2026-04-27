@@ -240,28 +240,40 @@ function _syncCoinDisplay() {
 }
 
 function getCoinBalance() {
-  // Sync from runtime global in case loadGame() ran after this module initialized
-  if (typeof playerCoins === 'number' && playerCoins !== coinBalance) coinBalance = playerCoins;
+  // Always read from account.data via getCoins() (single source of truth)
+  if (typeof getCoins === 'function') {
+    coinBalance = getCoins();
+  } else if (typeof playerCoins === 'number') {
+    coinBalance = playerCoins;
+  }
   return coinBalance;
 }
 
 function setCoinBalance(value) {
   const next = Math.max(0, Math.floor(Number(value) || 0));
   coinBalance = next;
-  if (typeof updateCoins === 'function') {
+  // Delegate to canonical setCoins() which writes to account.data first
+  if (typeof setCoins === 'function') {
+    setCoins(next);
+  } else if (typeof updateCoins === 'function') {
     updateCoins(function() { return next; });
   } else if (typeof playerCoins !== 'undefined') {
     playerCoins = next;
-    if (typeof saveGame === 'function') {
-      saveGame();
-    }
+    if (typeof saveGame === 'function') saveGame();
   }
   _syncCoinDisplay();
   return coinBalance;
 }
 
 function awardCoins(n) {
-  return setCoinBalance(getCoinBalance() + (Number(n) || 0));
+  const amount = Number(n) || 0;
+  if (typeof addCoins === 'function') {
+    addCoins(amount);
+    coinBalance = typeof getCoins === 'function' ? getCoins() : coinBalance + amount;
+    _syncCoinDisplay();
+    return coinBalance;
+  }
+  return setCoinBalance(getCoinBalance() + amount);
 }
 
 // ---- Unlocked cosmetics (sourced from unlockedCosmetics global) ----
@@ -277,8 +289,15 @@ function unlockCosmetic(id) {
   const entry = COSMETIC_CATALOG.find(c => c.id === id);
   if (!entry) return false;
   if (isCosmeticUnlocked(id)) return true;
-  if (getCoinBalance() < entry.price) return false;
-  setCoinBalance(getCoinBalance() - entry.price);
+  const _bal = typeof getCoins === 'function' ? getCoins() : getCoinBalance();
+  if (_bal < entry.price) return false;
+  if (typeof setCoins === 'function') {
+    setCoins(_bal - entry.price);
+    coinBalance = typeof getCoins === 'function' ? getCoins() : coinBalance - entry.price;
+    _syncCoinDisplay();
+  } else {
+    setCoinBalance(_bal - entry.price);
+  }
   if (typeof addCosmetic === 'function') {
     addCosmetic(id);
   } else if (typeof unlockedCosmetics !== 'undefined' && unlockedCosmetics.indexOf(id) === -1) {

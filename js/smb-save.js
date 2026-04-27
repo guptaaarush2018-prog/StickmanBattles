@@ -328,8 +328,8 @@ function _flushRuntimeIntoBase(base) {
   const _rch = (base.story && typeof base.story.chapter === 'number') ? base.story.chapter
     : (base.storyProgress && typeof base.storyProgress.chapter === 'number') ? base.storyProgress.chapter : 0;
   if (typeof base.chapter !== 'number' || _rch > base.chapter) base.chapter = _rch;
-  // coins — runtime is always authoritative (kept in sync by updateCoins → setAccountFlagWithRuntime)
-  if (typeof playerCoins === 'number') base.coins = playerCoins;
+  // coins — always read from account.data via getCoins() (the canonical source)
+  base.coins = getCoins();
   // cosmetics — runtime is always authoritative (kept in sync by addCosmetic → setAccountFlag)
   if (typeof unlockedCosmetics !== 'undefined' && Array.isArray(unlockedCosmetics)) {
     base.cosmetics = unlockedCosmetics.slice();
@@ -484,8 +484,8 @@ function _refreshRuntimeFromSave(data) {
     if (typeof godDefeated     !== 'undefined') godDefeated     = !!data.unlocks.godDefeated;
   }
 
-  // Coins and cosmetics — new v3 fields
-  if (typeof playerCoins !== 'undefined')       playerCoins       = (typeof data.coins === 'number') ? data.coins : 0;
+  // Coins — mirror account.data.coins into runtime global; use getCoins() for the canonical value
+  if (typeof playerCoins !== 'undefined') playerCoins = (typeof data.coins === 'number') ? data.coins : 0;
   if (typeof unlockedCosmetics !== 'undefined' && Array.isArray(data.cosmetics)) {
     unlockedCosmetics.length = 0;
     data.cosmetics.forEach(function(id) { unlockedCosmetics.push(id); });
@@ -596,22 +596,42 @@ function setAccountFlagWithRuntime(path, value, runtimeSetter) {
   }
 }
 
-// ── Coin update ───────────────────────────────────────────────────────────────
-function updateCoins(fn, _retry) {
-  const base = (typeof playerCoins !== 'undefined') ? playerCoins : 0;
-  const next = fn(base);
+// ── Canonical coin API — single source of truth is account.data.coins ────────
+// All coin reads and writes MUST go through these three functions.
+// playerCoins is a runtime mirror kept in sync; never read it directly for logic.
+
+function getCoins() {
+  const acct = window.GameState ? GameState.getActiveAccount() : null;
+  if (acct && acct.data && typeof acct.data.coins === 'number') return acct.data.coins;
+  return (typeof playerCoins === 'number') ? playerCoins : 0;
+}
+
+function setCoins(n) {
+  const clamped = Math.max(0, Math.floor(Number(n) || 0));
+  const acct = window.GameState ? GameState.getActiveAccount() : null;
+  const old = getCoins();
+  if (acct) {
+    if (!acct.data || typeof acct.data !== 'object') acct.data = {};
+    acct.data.coins = clamped;
+  }
+  if (typeof playerCoins !== 'undefined') playerCoins = clamped;
+  if (clamped !== old) console.info('[STATE MUTATION] coins', old, '->', clamped);
+  queueGameStateSave();
+}
+
+function addCoins(n) {
+  setCoins(getCoins() + (Number(n) || 0));
+}
+
+// ── Legacy updateCoins — kept for backward-compat; delegates to setCoins ─────
+function updateCoins(fn) {
+  if (typeof fn !== 'function') return;
+  const next = fn(getCoins());
   if (typeof next !== 'number' || !isFinite(next)) {
     console.warn('[coins] Invalid coin update result:', next);
     return;
   }
-  const clamped = Math.max(0, Math.floor(next));
-  if (!_retry && typeof playerCoins !== 'undefined' && base !== playerCoins) {
-    return updateCoins(fn, true);
-  }
-  if (clamped !== base) console.info('[STATE MUTATION] coins', base, '->', clamped);
-  setAccountFlagWithRuntime(['coins'], clamped, function(v) {
-    if (typeof playerCoins !== 'undefined') playerCoins = v;
-  });
+  setCoins(next);
 }
 
 // ── Collection wrappers ───────────────────────────────────────────────────────

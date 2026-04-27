@@ -111,8 +111,10 @@ const AccountManager = (() => {
     }
 
     // First run or fully corrupted — seed a default "Player 1" account.
-    // All progression now lives under smb_state; saveKey is kept only as legacy metadata.
+    // Include data + auth fields immediately so migrations never see a missing-data
+    // account and overwrite progress with empty defaults.
     const defaultId = 'acct_default';
+    const _sv = (typeof SAVE_VERSION !== 'undefined') ? SAVE_VERSION : 3;
     GameState.update(s => {
       s.persistent.activeAccountId = defaultId;
       s.persistent.accounts = {
@@ -122,6 +124,22 @@ const AccountManager = (() => {
           createdAt: Date.now(),
           saveKey:   'smb_state',
           role:      'player',
+          data: {
+            version: _sv,
+            coins: 0,
+            cosmetics: [],
+            achievements: [],
+            _legacyCleared: false,
+            unlocks: {
+              bossBeaten: false, trueform: false, megaknight: false,
+              letters: [], achievements: [],
+              sovereignBeaten: false, storyOnline: false, tfEndingSeen: false,
+              damnationScar: false, storyDodgeUnlocked: false, paradoxCompanion: false,
+              interTravel: false, patrolMode: false, godEncountered: false, godDefeated: false,
+            },
+            settings: { sfxVol: 0.35, sfxMute: false, musicMute: false, ragdoll: false },
+          },
+          auth: { passwordHash: null, recoveryCodeHash: null, locked: false },
         },
       };
     });
