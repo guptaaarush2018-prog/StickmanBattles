@@ -127,6 +127,7 @@ class Fighter {
 
   _isInvalidAITarget(candidate) {
     return !candidate || candidate === this || candidate.health <= 0 ||
+      (candidate.godmode === true) ||
       (typeof areAlliedEntities === 'function' && areAlliedEntities(this, candidate));
   }
 
@@ -138,9 +139,20 @@ class Fighter {
       ? [...players]
       : [...players, ...trainingDummies, ...minions];
     const living = pool.filter(q => !this._isInvalidAITarget(q));
-    this.target = living.length
-      ? living.reduce((a, b) => Math.hypot(b.cx() - this.cx(), b.cy() - this.cy()) < Math.hypot(a.cx() - this.cx(), a.cy() - this.cy()) ? b : a)
-      : null;
+    if (!living.length) { this.target = null; return this.target; }
+
+    // Player-priority: if any player is within 350 px, always pick the nearest one.
+    // Beyond that range, target the nearest entity regardless of type.
+    const _PLAYER_PRIO_RANGE = 350;
+    const nearPlayers = living.filter(q =>
+      Array.isArray(players) && players.includes(q) &&
+      Math.hypot(q.cx() - this.cx(), q.cy() - this.cy()) < _PLAYER_PRIO_RANGE
+    );
+    const candidates = nearPlayers.length > 0 ? nearPlayers : living;
+    this.target = candidates.reduce((a, b) =>
+      Math.hypot(b.cx() - this.cx(), b.cy() - this.cy()) <
+      Math.hypot(a.cx() - this.cx(), a.cy() - this.cy()) ? b : a
+    );
     return this.target;
   }
 

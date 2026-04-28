@@ -255,7 +255,8 @@ function _consoleExec(raw) {
       'gravity [n]             — set gravity multiplier (1=normal) [dev]',
       'noclip [p1|p2|on|off]   — toggle platform collision [dev]',
       '── Entities ─────────────────────────────────────────────────────',
-      'spawn <forestbeast|yeti|dummy|god> — spawn entity [dev]',
+      'spawn <forestbeast|yeti|minion|dummy|god> — spawn entity [dev]',
+      'spawn bot [weapon] [class]    — spawn an AI fighter (e.g. spawn bot gun megaknight) [dev]',
       'summon god — summon God entity (no crash behavior) [dev]',
       'bots reset              — reset all bot AI states',
       'bots kill               — kill all bots instantly',
@@ -379,23 +380,40 @@ function _consoleExec(raw) {
     if (typeof hasPermission === 'function' && !hasPermission('dev')) {
       _consoleErr('Permission denied — developer role required.'); return;
     }
-    if (!sub) { _consoleErr('Usage: spawn <forestbeast|yeti|dummy|god>'); return; }
+    if (!sub) { _consoleErr('Usage: spawn <forestbeast|yeti|minion|dummy|god|bot [weapon] [class]>'); return; }
     if (typeof gameRunning === 'undefined' || !gameRunning) { _consoleErr('Start a game first.'); return; }
+    const _spawnPos = () => {
+      if (typeof pickSafeSpawn === 'function') {
+        const sp = pickSafeSpawn('right');
+        if (sp) return sp;
+      }
+      return { x: 600, y: 300 };
+    };
     if (sub === 'forestbeast' || sub === 'forest') {
       if (typeof ForestBeast !== 'undefined') {
-        const fb = new ForestBeast(600, 300);
+        const _sp = _spawnPos();
+        const fb = new ForestBeast(_sp.x, _sp.y);
         minions.push(fb);
         _consoleOk('Spawned ForestBeast');
       } else _consoleErr('ForestBeast not available in this arena.');
     } else if (sub === 'yeti') {
       if (typeof Yeti !== 'undefined') {
-        const y = new Yeti(500, 300);
+        const _sp = _spawnPos();
+        const y = new Yeti(_sp.x, _sp.y);
         minions.push(y);
         _consoleOk('Spawned Yeti');
       } else _consoleErr('Yeti not available.');
+    } else if (sub === 'minion') {
+      if (typeof Minion !== 'undefined') {
+        const _sp = _spawnPos();
+        const mn = new Minion(_sp.x, _sp.y);
+        minions.push(mn);
+        _consoleOk('Spawned Minion');
+      } else _consoleErr('Minion not available.');
     } else if (sub === 'dummy') {
       if (typeof Dummy !== 'undefined') {
-        const d = new Dummy(450, 300);
+        const _sp = _spawnPos();
+        const d = new Dummy(_sp.x, _sp.y);
         d.playerNum = 9; d.name = 'DUMMY';
         trainingDummies.push(d);
         _consoleOk('Spawned Dummy');
@@ -404,9 +422,32 @@ function _consoleExec(raw) {
       if (typeof spawnGod === 'function') {
         const _g = spawnGod(true); // consoleSummoned=true suppresses crash screen
         if (_g) _consoleOk('Summoned God (no crash — dev mode)');
-        else    _consoleErr('God is already present.');
+        else    _consoleErr('I am already present.');
       } else _consoleErr('spawnGod not available.');
-    } else { _consoleErr('Unknown entity: ' + sub); }
+    } else if (sub === 'bot') {
+      if (typeof Fighter === 'undefined') { _consoleErr('Fighter not available.'); return; }
+      const _botWKey   = (parts[2] || 'sword').toLowerCase();
+      const _botCKey   = (parts[3] || '').toLowerCase();
+      const _botWeapon = (typeof WEAPONS !== 'undefined' && WEAPONS[_botWKey]) ? _botWKey : 'sword';
+      if (parts[2] && !WEAPONS[_botWKey]) _consolePrint('Unknown weapon "' + parts[2] + '" — defaulting to sword.', '#ffaa44');
+      if (_botCKey && typeof CLASSES !== 'undefined' && !CLASSES[_botCKey]) _consolePrint('Unknown class "' + parts[3] + '" — no class applied.', '#ffaa44');
+      const _sp  = _spawnPos();
+      const _num = players.length + 1;
+      const _botColors = ['#cc3322','#2244cc','#22aa44','#cc8800','#8833cc','#00aacc'];
+      const _col = _botColors[(_num - 1) % _botColors.length];
+      const bot  = new Fighter(_sp.x, _sp.y, _col, _botWeapon,
+        { left:null, right:null, jump:null, attack:null, ability:null, super:null },
+        true, 'hard');
+      bot.playerNum = _num;
+      bot.name      = 'BOT' + _num;
+      bot.lives     = 3;
+      bot.target    = players[0] || null;
+      if (_botCKey && typeof CLASSES !== 'undefined' && CLASSES[_botCKey] && typeof applyClass === 'function') {
+        applyClass(bot, _botCKey);
+      }
+      players.push(bot);
+      _consoleOk('Spawned bot #' + _num + ' (' + _botWeapon + (_botCKey && CLASSES && CLASSES[_botCKey] ? ' / ' + _botCKey : '') + ')');
+    } else { _consoleErr('Unknown entity: ' + sub + '.  Try: forestbeast yeti minion dummy god bot'); }
     return;
   }
 
@@ -417,7 +458,7 @@ function _consoleExec(raw) {
       if (typeof spawnGod === 'function') {
         const _g = spawnGod(true); // consoleSummoned=true suppresses crash screen
         if (_g) _consoleOk('Summoned God (no crash — dev mode)');
-        else    _consoleErr('God is already present.');
+        else    _consoleErr('I am already present.');
       } else _consoleErr('spawnGod not available.');
     } else {
       _consoleErr('Usage: summon god');

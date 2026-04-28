@@ -267,7 +267,14 @@ class God extends Fighter {
     this._trailTimer  = 0;
 
     // Flying state
-    this._flyVy = 0;
+    this._flyVy    = 0;
+    this._smiteTimer = 0;
+
+    // Dash state
+    this._dashCd     = 60;
+    this._dashFrames = 0;
+    this._dashVx     = 0;
+    this._dashVy     = 0;
 
     // Special attack state (Phase 2)
     this._specialCd     = 220;
@@ -317,8 +324,7 @@ class God extends Fighter {
   }
 
   _doHolySmite() {
-    // Slam downward then rebound
-    this._flyVy = 14;
+    this._smiteTimer = 28; // frames of forced dive
     this._smiteRings.push({ r: 0, maxR: 230, alpha: 1.0, _hitChecked: false });
     if (typeof screenShake !== 'undefined') screenShake = Math.max(screenShake, 7);
   }
@@ -358,15 +364,22 @@ class God extends Fighter {
 
   // ── Special effect logic ───────────────────────────────────────────────
 
+  _godTargetPool() {
+    const pool = [];
+    if (Array.isArray(players)) for (const p of players) pool.push(p);
+    if (Array.isArray(minions)) for (const m of minions) pool.push(m);
+    return pool;
+  }
+
   _updateColumns() {
     for (let i = this._columns.length - 1; i >= 0; i--) {
       const col = this._columns[i];
       col.timer++;
       if (!col.hitDealt && col.timer >= col.maxTimer - 8) {
         col.hitDealt = true;
-        if (Array.isArray(players) && typeof dealDamage === 'function') {
-          for (const p of players) {
-            if (p.health <= 0 || p.isMinion) continue;
+        if (typeof dealDamage === 'function') {
+          for (const p of this._godTargetPool()) {
+            if (p === this || p.health <= 0) continue;
             if (p._teamId !== undefined && this._teamId !== undefined && p._teamId === this._teamId) continue;
             if (Math.abs(p.cx() - col.x) < 46) dealDamage(this, p, 160, 14);
           }
@@ -385,9 +398,9 @@ class God extends Fighter {
     for (let i = this._novaRings.length - 1; i >= 0; i--) {
       const b = this._novaRings[i];
       b.x += b.vx; b.y += b.vy; b.timer++;
-      if (!b.hitDealt && Array.isArray(players) && typeof dealDamage === 'function') {
-        for (const p of players) {
-          if (p.health <= 0 || p.isMinion) continue;
+      if (!b.hitDealt && typeof dealDamage === 'function') {
+        for (const p of this._godTargetPool()) {
+          if (p === this || p.health <= 0) continue;
           if (p._teamId !== undefined && this._teamId !== undefined && p._teamId === this._teamId) continue;
           if (Math.hypot(p.cx() - b.x, (p.y + p.h / 2) - b.y) < 28) {
             dealDamage(this, p, 85, 10);
@@ -404,10 +417,10 @@ class God extends Fighter {
       const ring = this._smiteRings[i];
       ring.r    += 10;
       ring.alpha = Math.max(0, ring.alpha - 0.022);
-      if (!ring._hitChecked && ring.r > 50 && typeof dealDamage === 'function' && Array.isArray(players)) {
+      if (!ring._hitChecked && ring.r > 50 && typeof dealDamage === 'function') {
         ring._hitChecked = true;
-        for (const p of players) {
-          if (p.health <= 0 || p.isMinion) continue;
+        for (const p of this._godTargetPool()) {
+          if (p === this || p.health <= 0) continue;
           if (p._teamId !== undefined && this._teamId !== undefined && p._teamId === this._teamId) continue;
           if (Math.hypot(p.cx() - this.cx(), (p.y + p.h / 2) - (this.y + this.h / 2)) < ring.maxR * 0.9) {
             dealDamage(this, p, 130, 16);
@@ -444,37 +457,57 @@ class God extends Fighter {
     this._updateNova();
     this._updateSmiteRings();
 
-    // Recover from smite dive
-    if (this._flyVy > 0 && this._flyVy > -2) this._flyVy -= 1.2;
+    if (this._smiteTimer > 0) this._smiteTimer--;
 
-    // Find nearest target
+    // Find nearest target across all entities, skipping godmode entities
     let target = null, minDist = Infinity;
-    if (Array.isArray(players)) {
-      for (const p of players) {
-        if (p === this || p.isMinion || p.health <= 0) continue;
-        if (p._teamId !== undefined && this._teamId !== undefined && p._teamId === this._teamId) continue;
-        const d = Math.hypot(p.cx() - this.cx(), (p.y + p.h / 2) - (this.y + this.h / 2));
-        if (d < minDist) { minDist = d; target = p; }
-      }
+    for (const p of this._godTargetPool()) {
+      if (p === this || p.health <= 0 || p.godmode === true) continue;
+      if (p._teamId !== undefined && this._teamId !== undefined && p._teamId === this._teamId) continue;
+      const d = Math.hypot(p.cx() - this.cx(), (p.y + p.h / 2) - (this.y + this.h / 2));
+      if (d < minDist) { minDist = d; target = p; }
     }
     if (!target) return;
 
     this.target = target;
     this.facing = Math.sign(target.cx() - this.cx()) || 1;
 
-    // Desired hover position: above target with slow sinusoidal drift
-    const hoverX = target.cx() + Math.sin(this._hoverTime * 0.42) * 95;
-    const hoverY = (target.y + target.h / 2) - 115 + Math.sin(this._hoverTime * 0.68) * 22;
+    if (this._smiteTimer > 0) {
+      // Forced dive during smite
+      this.vx    *= 0.85;
+      this._flyVy = 12;
+    } else {
+      // Orbit radius collapses to zero when far away so God flies straight at range
+      const toDist    = Math.hypot(target.cx() - this.cx(), (target.y + target.h / 2) - (this.y + this.h / 2));
+      const orbitMult = Math.min(1, toDist / 160);
+      const hoverX    = target.cx() + Math.sin(this._hoverTime * 0.42) * 52 * orbitMult;
+      const hoverY    = (target.y + target.h / 2) - 100 + Math.sin(this._hoverTime * 0.68) * 14 * orbitMult;
 
-    const errX    = hoverX - this.cx();
-    const errY    = hoverY - (this.y + this.h / 2);
-    const flySpd  = this._phase === 1 ? 7.5 : 5.5;
-    const flyDist = Math.hypot(errX, errY) || 1;
-    const spd     = Math.min(flySpd, flyDist);
+      const errX    = hoverX - this.cx();
+      const errY    = hoverY - (this.y + this.h / 2);
+      const flySpd  = this._phase === 1 ? 32 : 26;
+      const flyDist = Math.hypot(errX, errY) || 1;
+      const spd     = Math.min(flySpd, flyDist);
 
-    this.vx      = (errX / flyDist) * spd;
-    this._flyVy += (errY / flyDist) * spd * 0.35;
-    this._flyVy  = Math.max(-12, Math.min(12, this._flyVy));
+      // Dash: fire a burst toward target every ~70 frames while chasing
+      if (this._dashCd > 0) this._dashCd--;
+      if (this._dashFrames > 0) {
+        this._dashFrames--;
+        this.vx     = this._dashVx;
+        this._flyVy = this._dashVy;
+      } else if (this._dashCd <= 0 && toDist > 80) {
+        const dashSpd  = this._phase === 1 ? 90 : 75;
+        this._dashVx   = (errX / flyDist) * dashSpd;
+        this._dashVy   = (errY / flyDist) * dashSpd;
+        this._dashFrames = 5;
+        this._dashCd     = this._phase === 1 ? 55 : 70;
+        this.vx     = this._dashVx;
+        this._flyVy = this._dashVy;
+      } else {
+        this.vx     = (errX / flyDist) * spd;
+        this._flyVy = (errY / flyDist) * spd; // direct set — no accumulation drift
+      }
+    }
 
     // Feed flyVy to Fighter physics by cancelling gravity before super.update()
     this.vy = this._flyVy - 0.65;
