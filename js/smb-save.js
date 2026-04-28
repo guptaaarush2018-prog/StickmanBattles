@@ -374,9 +374,7 @@ function _flushRuntimeIntoBase(base) {
 
 // ── Gather current state from individual localStorage keys (used by export) ──
 function _gatherSaveData() {
-  const active = (typeof GameState !== 'undefined' && typeof GameState.getActiveAccount === 'function')
-    ? GameState.getActiveAccount()
-    : null;
+  const active = _getActiveAcctDirect();
   const chapter = (typeof STORY_PROGRESS !== 'undefined' && typeof STORY_PROGRESS.chapter === 'number')
     ? STORY_PROGRESS.chapter
     : ((active && active.data && typeof active.data.chapter === 'number') ? active.data.chapter : 0);
@@ -408,14 +406,10 @@ function _gatherSaveData() {
       // Extended unlocks — sourced from runtime globals (hydrated by _refreshRuntimeFromSave)
       sovereignBeaten: (typeof sovereignBeaten !== 'undefined') ? !!sovereignBeaten : false,
       storyOnline:     (typeof storyOnline     !== 'undefined') ? !!storyOnline     : false,
-      tfEndingSeen:    (typeof GameState !== 'undefined' && GameState.getActiveAccount()
-                         ? !!GameState.getActiveAccount().data?.unlocks?.tfEndingSeen : false),
-      damnationScar:   (typeof GameState !== 'undefined' && GameState.getActiveAccount()
-                         ? !!GameState.getActiveAccount().data?.unlocks?.damnationScar : false),
-      interTravel:     (typeof GameState !== 'undefined' && GameState.getActiveAccount()
-                         ? !!GameState.getActiveAccount().data?.unlocks?.interTravel : false),
-      patrolMode:      (typeof GameState !== 'undefined' && GameState.getActiveAccount()
-                         ? !!GameState.getActiveAccount().data?.unlocks?.patrolMode : false),
+      tfEndingSeen:    !!(active && active.data && active.data.unlocks && active.data.unlocks.tfEndingSeen),
+      damnationScar:   !!(active && active.data && active.data.unlocks && active.data.unlocks.damnationScar),
+      interTravel:     !!(active && active.data && active.data.unlocks && active.data.unlocks.interTravel),
+      patrolMode:      !!(active && active.data && active.data.unlocks && active.data.unlocks.patrolMode),
       godEncountered:  (typeof godEncountered !== 'undefined') ? !!godEncountered : false,
       godDefeated:     (typeof godDefeated    !== 'undefined') ? !!godDefeated    : false,
     },
@@ -457,7 +451,7 @@ function _refreshRuntimeFromSave(data) {
 
   // Skip if we already hydrated this account — prevents redundant re-runs within a session.
   // Keyed by account ID (not a boolean) so account switches automatically pass through.
-  const _acct = window.GameState ? GameState.getActiveAccount() : null;
+  const _acct = _getActiveAcctDirect();
   const _acctId = _acct ? _acct.id : null;
   if (_acctId && _acctId === _hydratedAccountId) return;
 
@@ -570,7 +564,7 @@ function queueGameStateSave() {
 
 // ── Account flag setters ──────────────────────────────────────────────────────
 function setAccountFlag(path, value, acctOverride) {
-  const acct = acctOverride || (window.GameState ? GameState.getActiveAccount() : null);
+  const acct = acctOverride || _getActiveAcctDirect();
   if (!acct) return;
   let ref = acct.data;
   if (!ref) return;
@@ -589,7 +583,7 @@ function setAccountFlag(path, value, acctOverride) {
 }
 
 function setAccountFlagWithRuntime(path, value, runtimeSetter) {
-  const acct = window.GameState ? GameState.getActiveAccount() : null;
+  const acct = _getActiveAcctDirect();
   if (!acct) return;
   runtimeSetter(value);
   try {
@@ -604,14 +598,14 @@ function setAccountFlagWithRuntime(path, value, runtimeSetter) {
 // playerCoins is a runtime mirror kept in sync; never read it directly for logic.
 
 function getCoins() {
-  const acct = window.GameState ? GameState.getActiveAccount() : null;
+  const acct = _getActiveAcctDirect();
   if (acct && acct.data && typeof acct.data.coins === 'number') return acct.data.coins;
   return (typeof playerCoins === 'number') ? playerCoins : 0;
 }
 
 function setCoins(n) {
   const clamped = Math.max(0, Math.floor(Number(n) || 0));
-  const acct = window.GameState ? GameState.getActiveAccount() : null;
+  const acct = _getActiveAcctDirect();
   const old = getCoins();
   if (acct) {
     if (!acct.data || typeof acct.data !== 'object') acct.data = {};
@@ -668,6 +662,34 @@ function _clearLegacyKeys() {
 // ── Rehydration guard (keyed by account ID, not a boolean) ───────────────────
 let _hydratedAccountId = null;
 
+// ── Safe active-account accessor ──────────────────────────────────────────────
+// GameState.getActiveAccount() reads _state.persistent directly inside the IIFE
+// closure.  In some browser/timing scenarios it returns null even when
+// getPersistent().accounts[activeAccountId] exists.  This helper bypasses that
+// by reading through getPersistent() — the path that always works.
+let _diagWarnedOnce = false;
+function _getActiveAcctDirect() {
+  if (!window.GameState) return null;
+  try {
+    const p = GameState.getPersistent();
+    if (!p || !p.activeAccountId || !p.accounts) return null;
+    const a = p.accounts[p.activeAccountId];
+    if (!a) return null;
+    // Diagnostic: warn once if the canonical helper disagrees (avoids log spam)
+    if (!_diagWarnedOnce) {
+      const canonical = GameState.getActiveAccount();
+      if (!canonical) {
+        _diagWarnedOnce = true;
+        console.warn('[SAVE DIAG] getActiveAccount() returned null but direct lookup found account', {
+          activeAccountId: p.activeAccountId,
+          accountKeys: Object.keys(p.accounts),
+        });
+      }
+    }
+    return a;
+  } catch(e) { return null; }
+}
+
 function forceRehydrateFromAccount(acct) {
   _hydratedAccountId = null; // always bypass the _hydratedAccountId guard
   const _fdata = acct && acct.data ? _normalizeAccountSaveShape(acct.data) : null;
@@ -718,8 +740,8 @@ function _guardLocalStorageRead(key) {
 function saveGame() {
   try {
     if (!window.GameState) return;
-    const acct = GameState.getActiveAccount();
-    if (!acct) return;
+    const acct = _getActiveAcctDirect();
+    if (!acct) { console.warn('[SAVE SKIPPED] no active account found'); return; }
     // account.data is the single source of truth.
     // Start from existing account.data (already contains all setAccountFlag mutations)
     // then flush volatile runtime state (story, storyProgress, settings, progression)
@@ -760,7 +782,7 @@ function saveGame() {
 // ── Load (called once on page start, and on every account switch) ─────────────
 function loadGame() {
   try {
-    const acct = window.GameState ? GameState.getActiveAccount() : null;
+    const acct = _getActiveAcctDirect();
     console.info('[BOOT LOAD] start', { acct: acct ? acct.id : 'none' });
     const root = (window.GameState && typeof GameState.getPersistent === 'function')
       ? GameState.getPersistent()
